@@ -5,6 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DXNexus.Contracts\DXNexus.Contracts.csproj" />
+    <ProjectReference Include="..\DXNexus.LocalTransport\DXNexus.LocalTransport.csproj" />
   </ItemGroup>
 </Project>
-

@@ -1,4 +1,5 @@
 using SDRSharp.Common;
+using DXNexus.LocalTransport;
 using DXNexus.Plugin.Core;
 
 namespace DXNexus.SdrSharp.Plugin;
@@ -8,6 +9,7 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
     private ISharpControl? _control;
     private SdrSharpHostAdapter? _host;
     private RadioStateCollector? _collector;
+    private RadioStatePublisher? _publisher;
     private PluginPanel? _panel;
     private bool _closed;
 
@@ -36,12 +38,18 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _control = control;
         _host = new SdrSharpHostAdapter(control);
         _collector = new RadioStateCollector(_host);
+        _publisher = new RadioStatePublisher(
+            _collector,
+            new PipeRadioStateSink(LocalPipeName.ForCurrentWindowsUser()));
+        _publisher.Start();
     }
 
     public void LoadGui()
     {
         ObjectDisposedException.ThrowIf(_closed, this);
-        _panel ??= new PluginPanel(_collector ?? throw new InvalidOperationException("DXNexus has not been initialized."));
+        _panel ??= new PluginPanel(
+            _collector ?? throw new InvalidOperationException("DXNexus has not been initialized."),
+            _publisher ?? throw new InvalidOperationException("DXNexus has not been initialized."));
     }
 
     public void Close()
@@ -54,6 +62,8 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _closed = true;
         _panel?.Dispose();
         _panel = null;
+        _publisher?.Dispose();
+        _publisher = null;
         _collector?.Dispose();
         _collector = null;
         _host = null;

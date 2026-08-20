@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DXNexus.Plugin.Core", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DXNexus.Plugin.Core.Tests", "tests\DXNexus.Plugin.Core.Tests\DXNexus.Plugin.Core.Tests.csproj", "{3EB8672B-E9A9-4E03-9903-43EA6CD6CEEF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DXNexus.LocalTransport", "src\DXNexus.LocalTransport\DXNexus.LocalTransport.csproj", "{F4DC5D19-3595-479D-B7B1-78B07A726823}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DXNexus.LocalTransport.Tests", "tests\DXNexus.LocalTransport.Tests\DXNexus.LocalTransport.Tests.csproj", "{842FE218-20AF-4F63-8931-1270A3FA2F50}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,5 +49,13 @@ Global
 		{3EB8672B-E9A9-4E03-9903-43EA6CD6CEEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3EB8672B-E9A9-4E03-9903-43EA6CD6CEEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3EB8672B-E9A9-4E03-9903-43EA6CD6CEEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4DC5D19-3595-479D-B7B1-78B07A726823}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4DC5D19-3595-479D-B7B1-78B07A726823}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4DC5D19-3595-479D-B7B1-78B07A726823}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4DC5D19-3595-479D-B7B1-78B07A726823}.Release|Any CPU.Build.0 = Release|Any CPU
+		{842FE218-20AF-4F63-8931-1270A3FA2F50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{842FE218-20AF-4F63-8931-1270A3FA2F50}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{842FE218-20AF-4F63-8931-1270A3FA2F50}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{842FE218-20AF-4F63-8931-1270A3FA2F50}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

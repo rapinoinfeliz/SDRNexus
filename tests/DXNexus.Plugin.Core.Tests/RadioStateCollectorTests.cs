@@ -1,3 +1,4 @@
+using DXNexus.Contracts;
 using DXNexus.Plugin.Core;
 using Xunit;
 
@@ -54,6 +55,22 @@ public sealed class RadioStateCollectorTests
         Assert.Throws<ObjectDisposedException>(() => collector.CaptureFullSnapshot());
     }
 
+    [Fact]
+    public async Task PublisherConnectsOffThreadAndSendsTheLatestSnapshot()
+    {
+        var host = new FakeRadioHost(Snapshot(frequencyHz: 92_300_000));
+        using var collector = new RadioStateCollector(host);
+        var sink = new FakeRadioStateSink();
+        using var publisher = new RadioStatePublisher(collector, sink);
+
+        publisher.Start();
+        var first = await sink.FirstSnapshot.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(sink.IsConnected);
+        Assert.Equal(BridgeConnectionState.Connected, publisher.State);
+        Assert.Equal(92_300_000, first.Radio.FrequencyHz);
+    }
+
     private static RadioHostSnapshot Snapshot(long frequencyHz) => new(
         frequencyHz,
         92_100_000,
@@ -83,5 +100,30 @@ public sealed class RadioStateCollectorTests
         public RadioHostSnapshot CaptureSnapshot() => Current;
         public void NotifyChanged() => _stateChanged?.Invoke(this, EventArgs.Empty);
         public void Dispose() => Disposed = true;
+    }
+
+    private sealed class FakeRadioStateSink : IRadioStateSink
+    {
+        public TaskCompletionSource<SequencedRadioSnapshot> FirstSnapshot { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool IsConnected { get; private set; }
+
+        public Task ConnectAsync(CancellationToken cancellationToken)
+        {
+            IsConnected = true;
+            return Task.CompletedTask;
+        }
+
+        public Task SendAsync(SequencedRadioSnapshot snapshot, CancellationToken cancellationToken)
+        {
+            FirstSnapshot.TrySetResult(snapshot);
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            IsConnected = false;
+            return ValueTask.CompletedTask;
+        }
     }
 }

@@ -1,5 +1,7 @@
 namespace DXNexus.Plugin.Core;
 
+using DXNexus.Contracts;
+
 public sealed class RadioStateCollector : IDisposable
 {
     private readonly IRadioHost _host;
@@ -62,4 +64,3 @@ public sealed class RadioStateCollector : IDisposable
         _host.Dispose();
     }
 }
-

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using DXNexus.Contracts;
 using DXNexus.Plugin.Core;
 using SDRSharp.Common;
 using SDRSharp.Radio;
@@ -104,4 +105,3 @@ internal sealed class SdrSharpHostAdapter : IRadioHost
         _control.PropertyChanged -= HandlePropertyChanged;
     }
 }
-

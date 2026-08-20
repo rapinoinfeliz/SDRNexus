@@ -1,4 +1,4 @@
-namespace DXNexus.Plugin.Core;
+namespace DXNexus.Contracts;
 
 public enum RadioDetector
 {
