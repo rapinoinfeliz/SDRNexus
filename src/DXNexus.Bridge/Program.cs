@@ -17,6 +17,7 @@ internal static class Program
 
 internal sealed class BridgeApplicationContext : ApplicationContext
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly NotifyIcon _notifyIcon;
     private readonly BridgePipeServer _pipeServer;
     private readonly SynchronizationContext _uiContext;
@@ -24,6 +25,9 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private readonly AuthenticatedDeviceApiClient _apiClient;
     private readonly DeviceCredentialStore _credentialStore;
     private readonly BridgePreferencesStore _preferencesStore;
+    private readonly OfflineMutationQueue _offlineQueue;
+    private readonly SemaphoreSlim _syncGate = new(1, 1);
+    private readonly System.Threading.Timer _syncTimer;
     private CancellationTokenSource? _candidateQuery;
     private ReceptionSetupContext? _receptionSetup;
 
@@ -32,6 +36,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _credentialStore = new DeviceCredentialStore();
         _preferencesStore = new BridgePreferencesStore();
+        _offlineQueue = new OfflineMutationQueue();
         _httpClient = new HttpClient { BaseAddress = PairingApiClient.ProductionBaseUri };
         _apiClient = new AuthenticatedDeviceApiClient(_httpClient, _credentialStore);
         var menu = new ContextMenuStrip();
@@ -52,6 +57,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _pipeServer.ConnectionChanged += HandleConnectionChanged;
         _pipeServer.MessageReceived += HandleMessageReceived;
         _pipeServer.Start();
+        _syncTimer = new System.Threading.Timer(_ => _ = SynchronizeOfflineMutationsAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
     }
 
     private static void ShowPairing()
@@ -92,7 +98,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         }
         if (message.Type != "radio.snapshot") return;
 
-        var snapshot = message.Payload.Deserialize<SequencedRadioSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var snapshot = message.Payload.Deserialize<SequencedRadioSnapshot>(JsonOptions);
         if (snapshot is null)
         {
             return;
@@ -107,17 +113,24 @@ internal sealed class BridgeApplicationContext : ApplicationContext
 
     private async Task ApplyWishlistCommandAsync(WishlistCommand command, long sequence)
     {
+        var request = new WishlistMutationRequest(
+            Protocol.Version,
+            command.ClientMutationId,
+            command.Wishlisted ? "add" : "remove",
+            command.Candidate.BroadcastId,
+            command.Wishlisted ? StationMutationContext.FromCandidate(command.Candidate) : null);
         try
         {
-            var result = await _apiClient.SetWishlistAsync(new WishlistMutationRequest(
-                Protocol.Version,
-                command.ClientMutationId,
-                command.Wishlisted ? "add" : "remove",
-                command.Candidate.BroadcastId,
-                command.Wishlisted ? StationMutationContext.FromCandidate(command.Candidate) : null));
+            var result = await _apiClient.SetWishlistAsync(request);
             await SendCommandResultAsync(sequence, new CommandResult(
                 result.ClientMutationId, "wishlist", true,
                 result.Wishlisted ? "Added to Want to hear." : "Removed from Want to hear."));
+        }
+        catch (Exception error) when (IsTransient(error))
+        {
+            await _offlineQueue.EnqueueAsync(command.ClientMutationId, "wishlist", JsonSerializer.Serialize(request, JsonOptions));
+            await SendCommandResultAsync(sequence, new CommandResult(
+                command.ClientMutationId, "wishlist", true, "Target update saved offline and queued for synchronization."));
         }
         catch (Exception error)
         {
@@ -128,6 +141,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
 
     private async Task ApplyLogbookCommandAsync(QuickLogCommand command, long sequence)
     {
+        LogbookMutationRequest? request = null;
         try
         {
             var setup = await ResolveReceptionSetupAsync(CancellationToken.None).ConfigureAwait(false)
@@ -140,7 +154,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                 new SdrMeasurement("visual-peak", radio.Signal.VisualPeakDb, "display-dB", radio.Signal.Source, false),
                 new SdrMeasurement("visual-floor", radio.Signal.VisualFloorDb, "display-dB", radio.Signal.Source, false),
             };
-            var result = await _apiClient.CreateLogbookEntryAsync(new LogbookMutationRequest(
+            request = new LogbookMutationRequest(
                 Protocol.Version,
                 command.ClientMutationId,
                 command.Snapshot.CapturedAtUtc,
@@ -157,10 +171,17 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                     deviceId, radio.FrequencyHz, radio.CenterFrequencyHz,
                     radio.Detector.ToString().ToUpperInvariant(), radio.FilterBandwidthHz,
                     radio.InputSampleRateHz, measurements, false, radio.Rds,
-                    "0.1.0", "0.1.0", 1))).ConfigureAwait(false);
+                    "0.1.0", "0.1.0", 1));
+            var result = await _apiClient.CreateLogbookEntryAsync(request).ConfigureAwait(false);
             await SendCommandResultAsync(sequence, new CommandResult(
                 result.ClientMutationId, "logbook", true,
                 result.Created == false ? "Reception was already saved." : "Reception saved in DXNexus."));
+        }
+        catch (Exception error) when (request is not null && IsTransient(error))
+        {
+            await _offlineQueue.EnqueueAsync(command.ClientMutationId, "logbook", JsonSerializer.Serialize(request, JsonOptions));
+            await SendCommandResultAsync(sequence, new CommandResult(
+                command.ClientMutationId, "logbook", true, "Reception saved offline and queued for synchronization."));
         }
         catch (Exception error)
         {
@@ -175,11 +196,14 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private async Task<ReceptionSetupContext?> ResolveReceptionSetupAsync(CancellationToken cancellationToken)
     {
         if (_receptionSetup is not null) return _receptionSetup;
+        var preferences = await _preferencesStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (preferences.ReceptionSetup is not null)
+        {
+            _receptionSetup = preferences.ReceptionSetup;
+            return _receptionSetup;
+        }
         var availableTask = _apiClient.GetReceptionSetupAsync(cancellationToken);
-        var preferencesTask = _preferencesStore.LoadAsync(cancellationToken);
-        await Task.WhenAll(availableTask, preferencesTask).ConfigureAwait(false);
         var available = await availableTask.ConfigureAwait(false);
-        var preferences = await preferencesTask.ConfigureAwait(false);
         var point = available.ListeningPoints.FirstOrDefault(item => item.Id == preferences.ListeningPointId)
             ?? available.ListeningPoints.FirstOrDefault(item => item.IsDefault)
             ?? available.ListeningPoints.FirstOrDefault();
@@ -190,6 +214,58 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _receptionSetup = new ReceptionSetupContext(point.Id, receiver.Id);
         return _receptionSetup;
     }
+
+    private async Task SynchronizeOfflineMutationsAsync()
+    {
+        if (!await _syncGate.WaitAsync(0).ConfigureAwait(false)) return;
+        try
+        {
+            foreach (var queued in await _offlineQueue.DueAsync().ConfigureAwait(false))
+            {
+                try
+                {
+                    if (queued.Type == "wishlist")
+                    {
+                        var request = JsonSerializer.Deserialize<WishlistMutationRequest>(queued.PayloadJson, JsonOptions)
+                            ?? throw new InvalidDataException("Queued wishlist mutation is empty.");
+                        await _apiClient.SetWishlistAsync(request).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        var request = JsonSerializer.Deserialize<LogbookMutationRequest>(queued.PayloadJson, JsonOptions)
+                            ?? throw new InvalidDataException("Queued logbook mutation is empty.");
+                        await _apiClient.CreateLogbookEntryAsync(request).ConfigureAwait(false);
+                    }
+                    await _offlineQueue.CompleteAsync(queued.Id).ConfigureAwait(false);
+                }
+                catch (Exception error) when (IsTransient(error))
+                {
+                    await _offlineQueue.RetryLaterAsync(queued.Id, queued.Attempts).ConfigureAwait(false);
+                    break;
+                }
+                catch
+                {
+                    // A permanent validation failure cannot be repaired by retries.
+                    await _offlineQueue.CompleteAsync(queued.Id).ConfigureAwait(false);
+                }
+            }
+        }
+        catch
+        {
+            // Synchronization is best-effort and must never terminate the tray process.
+        }
+        finally { _syncGate.Release(); }
+    }
+
+    private static bool IsTransient(Exception error) => error switch
+    {
+        TaskCanceledException => true,
+        HttpRequestException http => http.StatusCode is null
+            || http.StatusCode == System.Net.HttpStatusCode.RequestTimeout
+            || http.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+            || (int)http.StatusCode >= 500,
+        _ => false,
+    };
 
     private async Task RefreshCandidatesAsync(SequencedRadioSnapshot snapshot)
     {
@@ -248,10 +324,13 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _notifyIcon.Visible = false;
         _candidateQuery?.Cancel();
         _candidateQuery?.Dispose();
+        _syncTimer.Dispose();
         _pipeServer.ConnectionChanged -= HandleConnectionChanged;
         _pipeServer.MessageReceived -= HandleMessageReceived;
         _pipeServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _apiClient.Dispose();
+        _offlineQueue.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _syncGate.Dispose();
         _httpClient.Dispose();
         _notifyIcon.Dispose();
         base.ExitThreadCore();

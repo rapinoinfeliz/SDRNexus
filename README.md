@@ -49,6 +49,11 @@ small explicit confirmation form and saves the reception with the current SDR
 snapshot and selected setup. Credentials remain inside the Bridge and no log
 is created without a user action.
 
+Explicit log and wishlist mutations use client-generated idempotency IDs. If
+DXNexus is temporarily unavailable, the Bridge stores them in a per-user local
+SQLite queue and retries with bounded exponential backoff. Transient tuner,
+signal and RDS snapshots are never queued as listening history.
+
 ## Development prerequisites
 
 - .NET 9 SDK;
