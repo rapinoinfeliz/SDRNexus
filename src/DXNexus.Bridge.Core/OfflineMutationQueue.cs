@@ -129,6 +129,10 @@ public sealed class OfflineMutationQueue(string? databasePath = null) : IAsyncDi
 
     public ValueTask DisposeAsync()
     {
+        // Microsoft.Data.Sqlite pools native handles after each short-lived
+        // connection. Release them so per-user uninstall/test cleanup can move
+        // or remove the queue without a Windows file-lock race.
+        SqliteConnection.ClearAllPools();
         _gate.Dispose();
         return ValueTask.CompletedTask;
     }
