@@ -23,6 +23,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private readonly HttpClient _httpClient;
     private readonly AuthenticatedDeviceApiClient _apiClient;
     private readonly DeviceCredentialStore _credentialStore;
+    private readonly BridgePreferencesStore _preferencesStore;
     private CancellationTokenSource? _candidateQuery;
     private ReceptionSetupContext? _receptionSetup;
 
@@ -30,10 +31,12 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     {
         _uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _credentialStore = new DeviceCredentialStore();
+        _preferencesStore = new BridgePreferencesStore();
         _httpClient = new HttpClient { BaseAddress = PairingApiClient.ProductionBaseUri };
         _apiClient = new AuthenticatedDeviceApiClient(_httpClient, _credentialStore);
         var menu = new ContextMenuStrip();
         menu.Items.Add("Connect to DXNexus…", null, (_, _) => ShowPairing());
+        menu.Items.Add("Reception setup…", null, (_, _) => ShowReceptionSetup());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
@@ -55,6 +58,12 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     {
         using var form = new PairingForm();
         form.ShowDialog();
+    }
+
+    private void ShowReceptionSetup()
+    {
+        using var form = new ReceptionSetupForm(_apiClient, _preferencesStore);
+        if (form.ShowDialog() == DialogResult.OK) _receptionSetup = form.SelectedSetup;
     }
 
     private void HandleConnectionChanged(object? sender, bool connected)
@@ -100,10 +109,16 @@ internal sealed class BridgeApplicationContext : ApplicationContext
             var setup = _receptionSetup;
             if (setup is null)
             {
-                var available = await _apiClient.GetReceptionSetupAsync(query.Token).ConfigureAwait(false);
-                var point = available.ListeningPoints.FirstOrDefault(item => item.IsDefault)
+                var availableTask = _apiClient.GetReceptionSetupAsync(query.Token);
+                var preferencesTask = _preferencesStore.LoadAsync(query.Token);
+                await Task.WhenAll(availableTask, preferencesTask).ConfigureAwait(false);
+                var available = await availableTask.ConfigureAwait(false);
+                var preferences = await preferencesTask.ConfigureAwait(false);
+                var point = available.ListeningPoints.FirstOrDefault(item => item.Id == preferences.ListeningPointId)
+                    ?? available.ListeningPoints.FirstOrDefault(item => item.IsDefault)
                     ?? available.ListeningPoints.FirstOrDefault();
-                var receiver = available.Receivers.FirstOrDefault(item => item.IsDefault)
+                var receiver = available.Receivers.FirstOrDefault(item => item.Id == preferences.ReceiverProfileId)
+                    ?? available.Receivers.FirstOrDefault(item => item.IsDefault)
                     ?? available.Receivers.FirstOrDefault();
                 if (point is null || receiver is null) return;
                 setup = new ReceptionSetupContext(point.Id, receiver.Id);
