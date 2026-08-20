@@ -15,17 +15,29 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
         _client.MessageReceived += (_, message) =>
         {
             MessageReceived?.Invoke(this, message);
-            if (message.Type != "context.candidates") return;
-            var candidates = message.Payload.Deserialize<CandidateContextResponse>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            if (candidates is not null) CandidatesReceived?.Invoke(this, candidates);
+            if (message.Type == "context.candidates")
+            {
+                var candidates = message.Payload.Deserialize<CandidateContextResponse>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (candidates is not null) CandidatesReceived?.Invoke(this, candidates);
+            }
+            else if (message.Type == "command.result")
+            {
+                var result = message.Payload.Deserialize<CommandResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (result is not null) CommandCompleted?.Invoke(this, result);
+            }
         };
     }
 
     public bool IsConnected => _client.IsConnected;
     public event EventHandler<PipeEnvelope>? MessageReceived;
     public event EventHandler<CandidateContextResponse>? CandidatesReceived;
+    public event EventHandler<CommandResult>? CommandCompleted;
     public Task ConnectAsync(CancellationToken cancellationToken) => _client.ConnectAsync(cancellationToken);
     public Task SendAsync(SequencedRadioSnapshot snapshot, CancellationToken cancellationToken) =>
         _client.SendAsync("radio.snapshot", snapshot.Sequence, snapshot, cancellationToken);
+    public Task SetWishlistAsync(StationCandidate candidate, bool wishlisted, long sequence, CancellationToken cancellationToken = default) =>
+        _client.SendAsync("command.wishlist", sequence, new WishlistCommand(Guid.CreateVersion7(), candidate, wishlisted), cancellationToken);
+    public Task LogAsync(QuickLogCommand command, long sequence, CancellationToken cancellationToken = default) =>
+        _client.SendAsync("command.logbook", sequence, command, cancellationToken);
     public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

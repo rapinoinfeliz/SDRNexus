@@ -2,6 +2,21 @@
   "protocol": "1.0",
   "clientMutationId": "019907f6-a065-7f30-9c5f-bc041afe5a21",
   "operation": "add",
-  "broadcastId": "fm-br-sc-band-923"
+  "broadcastId": "fm-br-sc-band-923",
+  "station": {
+    "broadcastId": "fm-br-sc-band-923",
+    "siteId": "site-br-sc-joacaba",
+    "name": "Band FM",
+    "band": "FM",
+    "frequencyHz": 92300000,
+    "logoUrl": null,
+    "transmitter": {
+      "siteName": "Joaçaba",
+      "city": "Joaçaba",
+      "region": "SC",
+      "country": "Brazil",
+      "coordinate": { "latitude": -27.17, "longitude": -51.5 },
+      "erpKw": 49
+    }
+  }
 }
-

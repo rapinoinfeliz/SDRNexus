@@ -78,10 +78,19 @@ internal sealed class BridgeApplicationContext : ApplicationContext
 
     private void HandleMessageReceived(object? sender, PipeEnvelope message)
     {
-        if (message.Type != "radio.snapshot")
+        if (message.Type == "command.wishlist")
         {
+            var command = message.Payload.Deserialize<WishlistCommand>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (command is not null) _ = ApplyWishlistCommandAsync(command, message.Sequence);
             return;
         }
+        if (message.Type == "command.logbook")
+        {
+            var command = message.Payload.Deserialize<QuickLogCommand>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (command is not null) _ = ApplyLogbookCommandAsync(command, message.Sequence);
+            return;
+        }
+        if (message.Type != "radio.snapshot") return;
 
         var snapshot = message.Payload.Deserialize<SequencedRadioSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
         if (snapshot is null)
@@ -96,6 +105,92 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _ = RefreshCandidatesAsync(snapshot);
     }
 
+    private async Task ApplyWishlistCommandAsync(WishlistCommand command, long sequence)
+    {
+        try
+        {
+            var result = await _apiClient.SetWishlistAsync(new WishlistMutationRequest(
+                Protocol.Version,
+                command.ClientMutationId,
+                command.Wishlisted ? "add" : "remove",
+                command.Candidate.BroadcastId,
+                command.Wishlisted ? StationMutationContext.FromCandidate(command.Candidate) : null));
+            await SendCommandResultAsync(sequence, new CommandResult(
+                result.ClientMutationId, "wishlist", true,
+                result.Wishlisted ? "Added to Want to hear." : "Removed from Want to hear."));
+        }
+        catch (Exception error)
+        {
+            await SendCommandResultAsync(sequence, new CommandResult(
+                command.ClientMutationId, "wishlist", false, $"Target update failed: {error.Message}"));
+        }
+    }
+
+    private async Task ApplyLogbookCommandAsync(QuickLogCommand command, long sequence)
+    {
+        try
+        {
+            var setup = await ResolveReceptionSetupAsync(CancellationToken.None).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Choose a reception setup in the Bridge first.");
+            var deviceId = await _apiClient.GetDeviceIdAsync().ConfigureAwait(false);
+            var radio = command.Snapshot.Radio;
+            var measurements = new[]
+            {
+                new SdrMeasurement("visual-snr", radio.Signal.VisualSnrDb, "display-dB", radio.Signal.Source, false),
+                new SdrMeasurement("visual-peak", radio.Signal.VisualPeakDb, "display-dB", radio.Signal.Source, false),
+                new SdrMeasurement("visual-floor", radio.Signal.VisualFloorDb, "display-dB", radio.Signal.Source, false),
+            };
+            var result = await _apiClient.CreateLogbookEntryAsync(new LogbookMutationRequest(
+                Protocol.Version,
+                command.ClientMutationId,
+                command.Snapshot.CapturedAtUtc,
+                command.Candidate.Band,
+                command.Candidate.FrequencyHz,
+                StationMutationContext.FromCandidate(command.Candidate),
+                setup,
+                command.SignalQuality,
+                command.IdentificationStatus,
+                command.IdentificationMethods,
+                command.Notes,
+                command.Propagation,
+                new SdrSnapshotContext(
+                    deviceId, radio.FrequencyHz, radio.CenterFrequencyHz,
+                    radio.Detector.ToString().ToUpperInvariant(), radio.FilterBandwidthHz,
+                    radio.InputSampleRateHz, measurements, false, radio.Rds,
+                    "0.1.0", "0.1.0", 1))).ConfigureAwait(false);
+            await SendCommandResultAsync(sequence, new CommandResult(
+                result.ClientMutationId, "logbook", true,
+                result.Created == false ? "Reception was already saved." : "Reception saved in DXNexus."));
+        }
+        catch (Exception error)
+        {
+            await SendCommandResultAsync(sequence, new CommandResult(
+                command.ClientMutationId, "logbook", false, $"Log failed: {error.Message}"));
+        }
+    }
+
+    private Task<bool> SendCommandResultAsync(long sequence, CommandResult result) =>
+        _pipeServer.SendAsync("command.result", sequence, result, CancellationToken.None);
+
+    private async Task<ReceptionSetupContext?> ResolveReceptionSetupAsync(CancellationToken cancellationToken)
+    {
+        if (_receptionSetup is not null) return _receptionSetup;
+        var availableTask = _apiClient.GetReceptionSetupAsync(cancellationToken);
+        var preferencesTask = _preferencesStore.LoadAsync(cancellationToken);
+        await Task.WhenAll(availableTask, preferencesTask).ConfigureAwait(false);
+        var available = await availableTask.ConfigureAwait(false);
+        var preferences = await preferencesTask.ConfigureAwait(false);
+        var point = available.ListeningPoints.FirstOrDefault(item => item.Id == preferences.ListeningPointId)
+            ?? available.ListeningPoints.FirstOrDefault(item => item.IsDefault)
+            ?? available.ListeningPoints.FirstOrDefault();
+        var receiver = available.Receivers.FirstOrDefault(item => item.Id == preferences.ReceiverProfileId)
+            ?? available.Receivers.FirstOrDefault(item => item.IsDefault)
+            ?? available.Receivers.FirstOrDefault();
+        if (point is null || receiver is null) return null;
+        _receptionSetup = new ReceptionSetupContext(point.Id, receiver.Id);
+        return _receptionSetup;
+    }
+
     private async Task RefreshCandidatesAsync(SequencedRadioSnapshot snapshot)
     {
         _candidateQuery?.Cancel();
@@ -106,24 +201,8 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         {
             await Task.Delay(450, query.Token).ConfigureAwait(false);
             if (!_credentialStore.Exists) return;
-            var setup = _receptionSetup;
-            if (setup is null)
-            {
-                var availableTask = _apiClient.GetReceptionSetupAsync(query.Token);
-                var preferencesTask = _preferencesStore.LoadAsync(query.Token);
-                await Task.WhenAll(availableTask, preferencesTask).ConfigureAwait(false);
-                var available = await availableTask.ConfigureAwait(false);
-                var preferences = await preferencesTask.ConfigureAwait(false);
-                var point = available.ListeningPoints.FirstOrDefault(item => item.Id == preferences.ListeningPointId)
-                    ?? available.ListeningPoints.FirstOrDefault(item => item.IsDefault)
-                    ?? available.ListeningPoints.FirstOrDefault();
-                var receiver = available.Receivers.FirstOrDefault(item => item.Id == preferences.ReceiverProfileId)
-                    ?? available.Receivers.FirstOrDefault(item => item.IsDefault)
-                    ?? available.Receivers.FirstOrDefault();
-                if (point is null || receiver is null) return;
-                setup = new ReceptionSetupContext(point.Id, receiver.Id);
-                _receptionSetup = setup;
-            }
+            var setup = await ResolveReceptionSetupAsync(query.Token).ConfigureAwait(false);
+            if (setup is null) return;
             var response = await _apiClient.GetCandidatesAsync(new CandidateContextRequest(
                 Protocol.Version,
                 Guid.CreateVersion7(),

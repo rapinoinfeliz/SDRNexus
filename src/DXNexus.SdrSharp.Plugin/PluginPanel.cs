@@ -13,6 +13,7 @@ internal sealed class PluginPanel : UserControl
     private readonly Label _modeLabel;
     private readonly Label _candidateStatusLabel;
     private readonly FlowLayoutPanel _candidateList;
+    private SequencedRadioSnapshot _latestSnapshot;
 
     public PluginPanel(RadioStateCollector collector, RadioStatePublisher publisher, PipeRadioStateSink sink)
     {
@@ -87,8 +88,24 @@ internal sealed class PluginPanel : UserControl
         _collector.SnapshotChanged += HandleSnapshotChanged;
         _publisher.ConnectionStateChanged += HandleConnectionStateChanged;
         _sink.CandidatesReceived += HandleCandidatesReceived;
-        Render(_collector.CaptureFullSnapshot());
+        _sink.CommandCompleted += HandleCommandCompleted;
+        _latestSnapshot = _collector.CaptureFullSnapshot();
+        Render(_latestSnapshot);
         RenderConnectionState(_publisher.State);
+    }
+
+    private void HandleCommandCompleted(object? sender, CommandResult result)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => HandleCommandCompleted(sender, result));
+            return;
+        }
+        _candidateStatusLabel.Text = result.Message;
+        _candidateStatusLabel.ForeColor = result.Success
+            ? Color.FromArgb(84, 226, 159)
+            : Color.FromArgb(255, 140, 140);
     }
 
     private void HandleCandidatesReceived(object? sender, CandidateContextResponse response)
@@ -113,16 +130,73 @@ internal sealed class PluginPanel : UserControl
         {
             var received = candidate.Received.AtListeningPoint ? " · heard here" : candidate.Wishlisted ? " · target" : "";
             var field = candidate.Estimate.FieldStrengthDbuvM is double value ? $" · {value:0} dBµV/m" : "";
-            _candidateList.Controls.Add(new Label
+            var info = new Label
             {
                 AutoSize = true,
                 MaximumSize = new Size(300, 0),
-                Margin = new Padding(0, 0, 0, 7),
+                Margin = new Padding(0),
                 Text = $"{candidate.StationName}\n{candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}{field}{received}",
                 ForeColor = candidate.Received.AtListeningPoint
                     ? Color.FromArgb(84, 226, 159)
                     : Color.WhiteSmoke,
-            });
+            };
+            var target = new Button
+            {
+                AutoSize = true,
+                FlatStyle = FlatStyle.Flat,
+                Text = candidate.Wishlisted ? "Remove target" : "Target",
+                ForeColor = candidate.Wishlisted ? Color.FromArgb(255, 150, 170) : Color.FromArgb(155, 215, 255),
+                Tag = candidate.Wishlisted,
+            };
+            target.Click += async (_, _) =>
+            {
+                try
+                {
+                    var next = !(target.Tag is true);
+                    target.Enabled = false;
+                    await _sink.SetWishlistAsync(candidate, next, _latestSnapshot.Sequence);
+                    target.Tag = next;
+                    target.Text = next ? "Remove target" : "Target";
+                    target.Enabled = true;
+                }
+                catch (Exception error)
+                {
+                    target.Enabled = true;
+                    _candidateStatusLabel.Text = $"Target update failed: {error.Message}";
+                }
+            };
+            var log = new Button { AutoSize = true, FlatStyle = FlatStyle.Flat, Text = "Log", ForeColor = Color.FromArgb(155, 215, 255) };
+            log.Click += async (_, _) =>
+            {
+                using var form = new QuickLogForm(candidate);
+                if (form.ShowDialog(this) != DialogResult.OK) return;
+                log.Enabled = false;
+                try
+                {
+                    await _sink.LogAsync(new QuickLogCommand(
+                        Guid.CreateVersion7(), candidate, form.SignalQuality, form.IdentificationStatus,
+                        form.IdentificationMethods, form.Notes, null, _latestSnapshot), _latestSnapshot.Sequence);
+                }
+                catch (Exception error)
+                {
+                    _candidateStatusLabel.Text = $"Log failed: {error.Message}";
+                }
+                finally { log.Enabled = true; }
+            };
+            var actions = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 3, 0, 0) };
+            actions.Controls.Add(target);
+            actions.Controls.Add(log);
+            var row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Margin = new Padding(0, 0, 0, 9),
+            };
+            row.Controls.Add(info);
+            row.Controls.Add(actions);
+            _candidateList.Controls.Add(row);
         }
         _candidateList.ResumeLayout();
     }
@@ -174,6 +248,7 @@ internal sealed class PluginPanel : UserControl
 
     private void Render(SequencedRadioSnapshot snapshot)
     {
+        _latestSnapshot = snapshot;
         _frequencyLabel.Text = FormatFrequency(snapshot.Radio.FrequencyHz);
         _modeLabel.Text = $"{snapshot.Radio.Detector.ToString().ToUpperInvariant()} · {snapshot.Radio.FilterBandwidthHz / 1_000d:0.#} kHz";
     }
@@ -192,6 +267,7 @@ internal sealed class PluginPanel : UserControl
             _collector.SnapshotChanged -= HandleSnapshotChanged;
             _publisher.ConnectionStateChanged -= HandleConnectionStateChanged;
             _sink.CandidatesReceived -= HandleCandidatesReceived;
+            _sink.CommandCompleted -= HandleCommandCompleted;
         }
 
         base.Dispose(disposing);

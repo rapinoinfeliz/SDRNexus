@@ -17,7 +17,11 @@
         "broadcastId": { "type": ["string", "null"], "maxLength": 160 },
         "siteId": { "type": ["string", "null"], "maxLength": 160 },
         "name": { "type": "string", "minLength": 1, "maxLength": 240 },
-        "manual": { "type": "boolean", "default": false }
+        "manual": { "type": "boolean", "default": false },
+        "band": { "type": "string", "enum": ["FM", "AM", "SW"] },
+        "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+        "logoUrl": { "type": ["string", "null"], "format": "uri-reference" },
+        "transmitter": { "$ref": "candidate-response.schema.json#/properties/candidates/items/properties/transmitter" }
       }
     },
     "receptionSetup": { "$ref": "common.schema.json#/$defs/receiverContext" },
@@ -74,4 +78,3 @@
     }
   }
 }
-

@@ -57,6 +57,39 @@ public sealed class AuthenticatedDeviceApiClient(
             ?? throw new InvalidDataException("DXNexus returned an empty candidate response.");
     }
 
+    public async Task<Guid> GetDeviceIdAsync(CancellationToken cancellationToken = default) =>
+        (await CurrentCredentialAsync(cancellationToken).ConfigureAwait(false)).DeviceId;
+
+    public async Task<WishlistMutationResponse> SetWishlistAsync(
+        WishlistMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = JsonSerializer.Serialize(request, JsonOptions);
+        using var response = await SendAsync(
+            () => new HttpRequestMessage(HttpMethod.Post, "wishlist")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+            }, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<WishlistMutationResponse>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false) ?? throw new InvalidDataException("DXNexus returned an empty wishlist response.");
+    }
+
+    public async Task<MutationResponse> CreateLogbookEntryAsync(
+        LogbookMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = JsonSerializer.Serialize(request, JsonOptions);
+        using var response = await SendAsync(
+            () => new HttpRequestMessage(HttpMethod.Post, "logbook")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+            }, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MutationResponse>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false) ?? throw new InvalidDataException("DXNexus returned an empty logbook response.");
+    }
+
     public async Task<HttpResponseMessage> SendAsync(
         Func<HttpRequestMessage> requestFactory,
         CancellationToken cancellationToken = default)

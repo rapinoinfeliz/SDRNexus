@@ -44,7 +44,10 @@ After pairing, tune SDR# to an FM, AM/MW, or SW broadcast channel. The Bridge
 waits briefly for tuning to settle, uses the default Listening Point and
 receiver saved in DXNexus, and returns the ranked exact-frequency candidates
 to the plugin. The panel shows distance, bearing, modeled field strength, and
-received/wishlist state. Credentials remain inside the Bridge.
+received/wishlist state. **Target** updates Want to hear, while **Log** opens a
+small explicit confirmation form and saves the reception with the current SDR
+snapshot and selected setup. Credentials remain inside the Bridge and no log
+is created without a user action.
 
 ## Development prerequisites
 

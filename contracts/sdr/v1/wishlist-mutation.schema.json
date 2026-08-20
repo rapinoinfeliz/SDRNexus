@@ -8,7 +8,29 @@
     "protocol": { "const": "1.0" },
     "clientMutationId": { "$ref": "common.schema.json#/$defs/uuid" },
     "operation": { "type": "string", "enum": ["add", "remove"] },
-    "broadcastId": { "type": "string", "minLength": 1, "maxLength": 160 }
+    "broadcastId": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "station": { "$ref": "#/$defs/stationContext" }
+  },
+  "allOf": [{
+    "if": { "properties": { "operation": { "const": "add" } } },
+    "then": {
+      "properties": { "station": { "$ref": "#/$defs/stationContext" } },
+      "required": ["station"]
+    }
+  }],
+  "$defs": {
+    "stationContext": {
+      "type": "object",
+      "required": ["broadcastId", "siteId", "name", "band", "frequencyHz", "transmitter"],
+      "properties": {
+        "broadcastId": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "siteId": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "band": { "type": "string", "enum": ["FM", "AM", "SW"] },
+        "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+        "logoUrl": { "type": ["string", "null"], "format": "uri-reference" },
+        "transmitter": { "$ref": "candidate-response.schema.json#/properties/candidates/items/properties/transmitter" }
+      }
+    }
   }
 }
-
