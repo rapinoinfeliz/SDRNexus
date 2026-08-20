@@ -1,0 +1,35 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+
+# IDE and user state
+.vs/
+.idea/
+*.user
+*.suo
+
+# Local SDR# SDK and host binaries must never be committed
+.sdk/
+SDRSharp.Common.dll
+SDRSharp.PanView.dll
+SDRSharp.Radio.dll
+SDRSharp.exe
+
+# Local Bridge state and credentials
+*.db
+*.db-shm
+*.db-wal
+*.log
+secrets.json
+
+# Packaging and signing output
+dist/
+*.pfx
+*.snk
+
+# OS files
+.DS_Store
+Thumbs.db
+
