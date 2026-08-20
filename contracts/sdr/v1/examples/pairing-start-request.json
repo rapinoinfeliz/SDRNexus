@@ -1,0 +1,22 @@
+{
+  "type": "pairing.start.request",
+  "deviceName": "DX Room PC",
+  "publicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF4",
+    "y": "x_FEzRu9YvY"
+  },
+  "requestedScopes": [
+    "sdr:state:write",
+    "sdr:context:read",
+    "logbook:create",
+    "wishlist:write"
+  ],
+  "client": {
+    "bridgeVersion": "0.1.0",
+    "pluginVersion": "0.1.0",
+    "sdrSharpRevision": 1921
+  }
+}
+

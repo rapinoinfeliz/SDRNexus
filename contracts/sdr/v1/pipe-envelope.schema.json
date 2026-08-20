@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/pipe-envelope.schema.json",
+  "title": "Plugin to Bridge pipe envelope",
+  "type": "object",
+  "required": ["protocol", "type", "id", "sequence", "sentAt", "sessionNonce", "payload"],
+  "properties": {
+    "protocol": { "const": "1.0" },
+    "type": {
+      "type": "string",
+      "enum": ["hello", "welcome", "radio.snapshot", "radio.state.changed", "context.request", "context.candidates", "logbook.create", "logbook.result", "wishlist.mutate", "wishlist.result", "error"]
+    },
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "sentAt": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+    "sessionNonce": { "type": "string", "minLength": 32, "maxLength": 128 },
+    "payload": { "type": "object" }
+  }
+}
+

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/logbook-create.schema.json",
+  "title": "Explicit SDRNexus logbook creation",
+  "type": "object",
+  "required": ["protocol", "clientMutationId", "receivedAtUtc", "band", "frequencyHz", "station", "receptionSetup", "signalQuality", "identificationStatus", "sdrSnapshot"],
+  "properties": {
+    "protocol": { "const": "1.0" },
+    "clientMutationId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "receivedAtUtc": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+    "band": { "$ref": "common.schema.json#/$defs/band" },
+    "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+    "station": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "broadcastId": { "type": ["string", "null"], "maxLength": 160 },
+        "siteId": { "type": ["string", "null"], "maxLength": 160 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "manual": { "type": "boolean", "default": false }
+      }
+    },
+    "receptionSetup": { "$ref": "common.schema.json#/$defs/receiverContext" },
+    "signalQuality": {
+      "type": "string",
+      "enum": ["barely-audible", "poor", "fair", "good", "excellent"]
+    },
+    "identificationStatus": {
+      "type": "string",
+      "enum": ["confirmed", "probable", "tentative", "unidentified"]
+    },
+    "identificationMethods": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["station-id", "rds-pi", "rds-ps", "rds-rt", "official-stream", "program-content", "schedule", "other"]
+      }
+    },
+    "notes": { "type": "string", "maxLength": 5000 },
+    "propagation": {
+      "type": "string",
+      "enum": ["normal", "tropospheric", "sporadic-e", "meteor-scatter", "unknown", "other"]
+    },
+    "sdrSnapshot": {
+      "type": "object",
+      "required": ["deviceId", "tunedFrequencyHz", "detector", "filterBandwidthHz", "measurements", "calibrated"],
+      "properties": {
+        "deviceId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "tunedFrequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+        "centerFrequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+        "detector": { "$ref": "common.schema.json#/$defs/detector" },
+        "filterBandwidthHz": { "$ref": "common.schema.json#/$defs/bandwidthHz" },
+        "sampleRateHz": { "type": "integer", "minimum": 1, "maximum": 100000000 },
+        "measurements": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "common.schema.json#/$defs/measurement" }
+        },
+        "calibrated": { "type": "boolean" },
+        "rds": {
+          "type": "object",
+          "properties": {
+            "pi": { "type": "string", "pattern": "^[0-9A-Fa-f]{4}$" },
+            "ps": { "type": "string", "maxLength": 32 },
+            "rt": { "type": "string", "maxLength": 256 }
+          }
+        },
+        "pluginVersion": { "type": "string", "maxLength": 40 },
+        "bridgeVersion": { "type": "string", "maxLength": 40 },
+        "sdrSharpRevision": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
+

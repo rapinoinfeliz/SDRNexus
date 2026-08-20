@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/wishlist-mutation.schema.json",
+  "title": "SDRNexus wishlist mutation",
+  "type": "object",
+  "required": ["protocol", "clientMutationId", "operation", "broadcastId"],
+  "properties": {
+    "protocol": { "const": "1.0" },
+    "clientMutationId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "operation": { "type": "string", "enum": ["add", "remove"] },
+    "broadcastId": { "type": "string", "minLength": 1, "maxLength": 160 }
+  }
+}
+

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/candidate-response.schema.json",
+  "title": "Candidate context response",
+  "type": "object",
+  "required": ["protocol", "requestId", "sequence", "generatedAt", "band", "frequencyHz", "catalogVersion", "modelVersion", "candidates"],
+  "properties": {
+    "protocol": { "const": "1.0" },
+    "requestId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "generatedAt": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+    "band": { "$ref": "common.schema.json#/$defs/band" },
+    "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+    "catalogVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "modelVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "cached": { "type": "boolean", "default": false },
+    "nextCursor": { "type": ["string", "null"], "maxLength": 256 },
+    "candidates": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["broadcastId", "siteId", "stationName", "frequencyHz", "band", "transmitter", "distanceKm", "bearingDeg", "bearingCardinal", "estimate", "received", "wishlisted"],
+        "properties": {
+          "broadcastId": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "siteId": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "stationName": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+          "band": { "$ref": "common.schema.json#/$defs/band" },
+          "logoUrl": { "type": ["string", "null"], "format": "uri-reference" },
+          "transmitter": {
+            "type": "object",
+            "required": ["coordinate"],
+            "properties": {
+              "siteName": { "type": ["string", "null"], "maxLength": 240 },
+              "city": { "type": ["string", "null"], "maxLength": 160 },
+              "region": { "type": ["string", "null"], "maxLength": 160 },
+              "country": { "type": ["string", "null"], "maxLength": 160 },
+              "coordinate": { "$ref": "common.schema.json#/$defs/coordinate" },
+              "erpKw": { "type": ["number", "null"], "minimum": 0 }
+            }
+          },
+          "distanceKm": { "type": "number", "minimum": 0 },
+          "bearingDeg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+          "bearingCardinal": { "type": "string", "maxLength": 8 },
+          "schedule": {
+            "type": "object",
+            "required": ["state"],
+            "properties": {
+              "state": { "type": "string", "enum": ["on-air", "off-air", "unknown"] },
+              "label": { "type": "string", "maxLength": 160 }
+            }
+          },
+          "estimate": {
+            "type": "object",
+            "required": ["tier", "confidence", "refinedByTerrain", "summary"],
+            "properties": {
+              "tier": { "$ref": "common.schema.json#/$defs/receptionTier" },
+              "confidence": { "$ref": "common.schema.json#/$defs/modelConfidence" },
+              "fieldStrengthDbuvM": { "type": ["number", "null"] },
+              "signalMarginDb": { "type": ["number", "null"] },
+              "dominantMode": { "type": ["string", "null"], "maxLength": 80 },
+              "refinedByTerrain": { "type": "boolean" },
+              "summary": { "type": "string", "minLength": 1, "maxLength": 300 },
+              "limitations": {
+                "type": "array",
+                "maxItems": 16,
+                "items": { "type": "string", "maxLength": 240 }
+              }
+            }
+          },
+          "received": {
+            "type": "object",
+            "required": ["globally", "atListeningPoint", "count"],
+            "properties": {
+              "globally": { "type": "boolean" },
+              "atListeningPoint": { "type": "boolean" },
+              "count": { "type": "integer", "minimum": 0 },
+              "lastReceivedAt": {
+                "oneOf": [
+                  { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+                  { "type": "null" }
+                ]
+              }
+            }
+          },
+          "wishlisted": { "type": "boolean" },
+          "interference": {
+            "type": "object",
+            "required": ["severity", "summary"],
+            "properties": {
+              "severity": { "type": "string", "enum": ["none", "low", "moderate", "high", "unknown"] },
+              "summary": { "type": "string", "maxLength": 300 }
+            }
+          },
+          "deepLink": { "type": "string", "format": "uri-reference" }
+        }
+      }
+    }
+  }
+}
+

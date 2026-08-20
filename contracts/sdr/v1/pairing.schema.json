@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/pairing.schema.json",
+  "title": "SDRNexus pairing messages",
+  "oneOf": [
+    { "$ref": "#/$defs/startRequest" },
+    { "$ref": "#/$defs/startResponse" },
+    { "$ref": "#/$defs/tokenRequest" },
+    { "$ref": "#/$defs/tokenResponse" }
+  ],
+  "$defs": {
+    "scope": {
+      "type": "string",
+      "enum": ["sdr:state:write", "sdr:context:read", "logbook:create", "wishlist:write"]
+    },
+    "startRequest": {
+      "type": "object",
+      "required": ["type", "deviceName", "publicKeyJwk", "requestedScopes", "client"],
+      "properties": {
+        "type": { "const": "pairing.start.request" },
+        "deviceName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "publicKeyJwk": { "type": "object" },
+        "requestedScopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/scope" }
+        },
+        "client": {
+          "type": "object",
+          "required": ["bridgeVersion", "pluginVersion", "sdrSharpRevision"],
+          "properties": {
+            "bridgeVersion": { "type": "string", "maxLength": 40 },
+            "pluginVersion": { "type": "string", "maxLength": 40 },
+            "sdrSharpRevision": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "startResponse": {
+      "type": "object",
+      "required": ["type", "deviceCode", "userCode", "verificationUri", "expiresInSeconds", "pollIntervalSeconds"],
+      "properties": {
+        "type": { "const": "pairing.start.response" },
+        "deviceCode": { "type": "string", "minLength": 32, "maxLength": 512 },
+        "userCode": { "type": "string", "pattern": "^[A-Z0-9-]{8,12}$" },
+        "verificationUri": { "type": "string", "format": "uri" },
+        "expiresInSeconds": { "type": "integer", "minimum": 60, "maximum": 900 },
+        "pollIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 60 }
+      }
+    },
+    "tokenRequest": {
+      "type": "object",
+      "required": ["type", "deviceCode", "proof"],
+      "properties": {
+        "type": { "const": "pairing.token.request" },
+        "deviceCode": { "type": "string", "minLength": 32, "maxLength": 512 },
+        "proof": { "type": "string", "minLength": 32, "maxLength": 4096 }
+      }
+    },
+    "tokenResponse": {
+      "type": "object",
+      "required": ["type", "deviceId", "accessToken", "refreshToken", "tokenType", "expiresInSeconds", "scopes"],
+      "properties": {
+        "type": { "const": "pairing.token.response" },
+        "deviceId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "accessToken": { "type": "string", "minLength": 32, "maxLength": 8192 },
+        "refreshToken": { "type": "string", "minLength": 32, "maxLength": 1024 },
+        "tokenType": { "const": "DPoP" },
+        "expiresInSeconds": { "type": "integer", "minimum": 60, "maximum": 900 },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/scope" }
+        }
+      }
+    }
+  }
+}
+

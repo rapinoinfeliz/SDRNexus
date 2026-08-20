@@ -1,0 +1,48 @@
+{
+  "protocol": "1.0",
+  "clientMutationId": "019907f4-a065-7f30-9c5f-bc041afe5a21",
+  "receivedAtUtc": "2026-08-20T18:20:00Z",
+  "band": "FM",
+  "frequencyHz": 92300000,
+  "station": {
+    "broadcastId": "fm-br-sc-band-923",
+    "siteId": "site-br-sc-joacaba-band",
+    "name": "Band FM",
+    "manual": false
+  },
+  "receptionSetup": {
+    "listeningPointId": "019907e3-ea01-7f30-9c5f-bc041afe5a21",
+    "receiverProfileId": "019907e4-9201-7f30-9c5f-bc041afe5a21"
+  },
+  "signalQuality": "good",
+  "identificationStatus": "confirmed",
+  "identificationMethods": ["rds-pi", "rds-ps"],
+  "notes": "Stable stereo reception.",
+  "propagation": "normal",
+  "sdrSnapshot": {
+    "deviceId": "019907e5-3100-7f30-9c5f-bc041afe5a21",
+    "tunedFrequencyHz": 92300000,
+    "centerFrequencyHz": 92100000,
+    "detector": "WFM",
+    "filterBandwidthHz": 180000,
+    "sampleRateHz": 768000,
+    "measurements": [
+      {
+        "type": "visual-snr",
+        "value": 22.4,
+        "unit": "display-dB",
+        "source": "sdrsharp.visual",
+        "calibrated": false
+      }
+    ],
+    "calibrated": false,
+    "rds": {
+      "pi": "9401",
+      "ps": "BAND_FM"
+    },
+    "pluginVersion": "0.1.0",
+    "bridgeVersion": "0.1.0",
+    "sdrSharpRevision": 1921
+  }
+}
+

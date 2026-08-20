@@ -1,0 +1,63 @@
+{
+  "protocol": "1.0",
+  "requestId": "019907e7-743e-7f30-9c5f-bc041afe5a21",
+  "sequence": 1842,
+  "generatedAt": "2026-08-20T18:14:03.480Z",
+  "band": "FM",
+  "frequencyHz": 92300000,
+  "catalogVersion": "2026-08-20",
+  "modelVersion": "fm-physical-v8",
+  "cached": false,
+  "nextCursor": null,
+  "candidates": [
+    {
+      "broadcastId": "fm-br-sc-band-923",
+      "siteId": "site-br-sc-joacaba-band",
+      "stationName": "Band FM",
+      "frequencyHz": 92300000,
+      "band": "FM",
+      "logoUrl": "/data/radio/logos/band-fm.webp",
+      "transmitter": {
+        "siteName": "Joaçaba",
+        "city": "Joaçaba",
+        "region": "Santa Catarina",
+        "country": "Brazil",
+        "coordinate": {
+          "latitude": -27.171,
+          "longitude": -51.504
+        },
+        "erpKw": 49
+      },
+      "distanceKm": 36.9,
+      "bearingDeg": 313,
+      "bearingCardinal": "NW",
+      "schedule": {
+        "state": "on-air",
+        "label": "Listed active"
+      },
+      "estimate": {
+        "tier": "strong",
+        "confidence": "medium",
+        "fieldStrengthDbuvM": 60.2,
+        "signalMarginDb": 6.2,
+        "dominantMode": "terrain diffraction",
+        "refinedByTerrain": true,
+        "summary": "Strong operational field estimate; reception is not guaranteed.",
+        "limitations": ["Antenna pattern is not available."]
+      },
+      "received": {
+        "globally": true,
+        "atListeningPoint": false,
+        "count": 1,
+        "lastReceivedAt": "2026-07-26T02:12:00Z"
+      },
+      "wishlisted": false,
+      "interference": {
+        "severity": "low",
+        "summary": "No stronger co-channel candidate in the current result set."
+      },
+      "deepLink": "/?broadcast=fm-br-sc-band-923&source=sdrsharp"
+    }
+  ]
+}
+

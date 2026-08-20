@@ -1,0 +1,152 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DXNexus SDR Integration API",
+    "version": "1.0.0",
+    "description": "Device-paired API used by SDRNexus. Browser sessions and device principals are intentionally separate."
+  },
+  "servers": [
+    { "url": "https://dxnexus.rapinoinfeliz.workers.dev/api/sdr/v1" }
+  ],
+  "paths": {
+    "/pairing/start": {
+      "post": {
+        "operationId": "startPairing",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "pairing.schema.json#/$defs/startRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pairing request created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "pairing.schema.json#/$defs/startResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/$defs/problemResponse" },
+          "429": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    },
+    "/pairing/token": {
+      "post": {
+        "operationId": "pollPairingToken",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "pairing.schema.json#/$defs/tokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device credential issued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "pairing.schema.json#/$defs/tokenResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/$defs/problemResponse" },
+          "428": { "$ref": "#/$defs/problemResponse" },
+          "429": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    },
+    "/candidates": {
+      "post": {
+        "operationId": "getCandidates",
+        "security": [{ "deviceDPoP": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "candidate-request.schema.json" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranked candidate context",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "candidate-response.schema.json" }
+              }
+            }
+          },
+          "400": { "$ref": "#/$defs/problemResponse" },
+          "401": { "$ref": "#/$defs/problemResponse" },
+          "429": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    },
+    "/logbook": {
+      "post": {
+        "operationId": "createLogbookEntry",
+        "security": [{ "deviceDPoP": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "logbook-create.schema.json" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Log created" },
+          "200": { "description": "Existing idempotent mutation returned" },
+          "400": { "$ref": "#/$defs/problemResponse" },
+          "401": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    },
+    "/wishlist": {
+      "post": {
+        "operationId": "mutateWishlist",
+        "security": [{ "deviceDPoP": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "wishlist-mutation.schema.json" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Wishlist state updated" },
+          "400": { "$ref": "#/$defs/problemResponse" },
+          "401": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "deviceDPoP": {
+        "type": "http",
+        "scheme": "DPoP",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "$defs": {
+    "problemResponse": {
+      "description": "Problem details",
+      "content": {
+        "application/problem+json": {
+          "schema": { "$ref": "problem.schema.json" }
+        }
+      }
+    }
+  }
+}
+

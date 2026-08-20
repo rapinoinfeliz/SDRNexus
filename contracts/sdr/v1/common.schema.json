@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/common.schema.json",
+  "title": "SDRNexus common types",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "frequencyHz": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 3000000000
+    },
+    "bandwidthHz": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000
+    },
+    "band": {
+      "type": "string",
+      "enum": ["FM", "AM", "SW", "LW"]
+    },
+    "detector": {
+      "type": "string",
+      "enum": ["WFM", "NFM", "AM", "DSB", "LSB", "USB", "CW", "RAW", "UNKNOWN"]
+    },
+    "modelConfidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low", "unknown"]
+    },
+    "receptionTier": {
+      "type": "string",
+      "enum": ["strong", "possible", "weak", "unlikely", "unknown"]
+    },
+    "measurement": {
+      "type": "object",
+      "required": ["type", "value", "unit", "source", "calibrated"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["visual-snr", "visual-peak", "visual-floor", "receiver-input", "other"]
+        },
+        "value": { "type": "number" },
+        "unit": {
+          "type": "string",
+          "enum": ["display-dB", "dBFS", "dBm", "dBuV", "dBuV/m", "S-unit", "other"]
+        },
+        "source": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "calibrated": { "type": "boolean" },
+        "referenceImpedanceOhm": { "type": "number", "exclusiveMinimum": 0 },
+        "notes": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "receiverContext": {
+      "type": "object",
+      "required": ["listeningPointId", "receiverProfileId"],
+      "properties": {
+        "listeningPointId": { "$ref": "#/$defs/uuid" },
+        "receiverProfileId": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "coordinate": {
+      "type": "object",
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    }
+  }
+}
+

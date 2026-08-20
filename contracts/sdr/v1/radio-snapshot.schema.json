@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/radio-snapshot.schema.json",
+  "title": "SDR# radio snapshot",
+  "type": "object",
+  "required": ["protocol", "type", "id", "sequence", "sentAt", "payload"],
+  "properties": {
+    "protocol": { "const": "1.0" },
+    "type": { "const": "radio.snapshot" },
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "sentAt": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+    "deviceId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "payload": {
+      "type": "object",
+      "required": ["frequencyHz", "centerFrequencyHz", "detector", "filterBandwidthHz", "playing"],
+      "properties": {
+        "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+        "centerFrequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+        "detector": { "$ref": "common.schema.json#/$defs/detector" },
+        "filterBandwidthHz": { "$ref": "common.schema.json#/$defs/bandwidthHz" },
+        "rfDisplayBandwidthHz": { "$ref": "common.schema.json#/$defs/bandwidthHz" },
+        "sampleRateHz": { "type": "integer", "minimum": 1, "maximum": 100000000 },
+        "playing": { "type": "boolean" },
+        "sourceName": { "type": "string", "maxLength": 120 },
+        "measurements": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "common.schema.json#/$defs/measurement" }
+        },
+        "rds": {
+          "type": "object",
+          "properties": {
+            "pi": { "type": "string", "pattern": "^[0-9A-Fa-f]{4}$" },
+            "ps": { "type": "string", "maxLength": 32 },
+            "rt": { "type": "string", "maxLength": 256 }
+          }
+        },
+        "receiver": { "$ref": "common.schema.json#/$defs/receiverContext" },
+        "client": {
+          "type": "object",
+          "required": ["pluginVersion", "bridgeVersion", "sdrSharpRevision", "architecture"],
+          "properties": {
+            "pluginVersion": { "type": "string", "maxLength": 40 },
+            "bridgeVersion": { "type": "string", "maxLength": 40 },
+            "sdrSharpRevision": { "type": "integer", "minimum": 1 },
+            "architecture": { "type": "string", "enum": ["x86", "x64", "arm64", "unknown"] },
+            "capabilities": {
+              "type": "array",
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": { "type": "string", "maxLength": 80 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

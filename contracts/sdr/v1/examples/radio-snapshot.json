@@ -1,0 +1,44 @@
+{
+  "protocol": "1.0",
+  "type": "radio.snapshot",
+  "id": "019907e6-268c-7f30-9c5f-bc041afe5a21",
+  "sequence": 1842,
+  "sentAt": "2026-08-20T18:14:03.219Z",
+  "deviceId": "019907e5-3100-7f30-9c5f-bc041afe5a21",
+  "payload": {
+    "frequencyHz": 92300000,
+    "centerFrequencyHz": 92100000,
+    "detector": "WFM",
+    "filterBandwidthHz": 180000,
+    "rfDisplayBandwidthHz": 660000,
+    "sampleRateHz": 768000,
+    "playing": true,
+    "sourceName": "Airspy HF+ Discovery",
+    "measurements": [
+      {
+        "type": "visual-snr",
+        "value": 22.4,
+        "unit": "display-dB",
+        "source": "sdrsharp.visual",
+        "calibrated": false
+      }
+    ],
+    "rds": {
+      "pi": "9401",
+      "ps": "BAND_FM",
+      "rt": "Band FM"
+    },
+    "receiver": {
+      "listeningPointId": "019907e3-ea01-7f30-9c5f-bc041afe5a21",
+      "receiverProfileId": "019907e4-9201-7f30-9c5f-bc041afe5a21"
+    },
+    "client": {
+      "pluginVersion": "0.1.0",
+      "bridgeVersion": "0.1.0",
+      "sdrSharpRevision": 1921,
+      "architecture": "x64",
+      "capabilities": ["frequency.read", "mode.read", "bandwidth.read", "rds.read", "metrics.relative"]
+    }
+  }
+}
+

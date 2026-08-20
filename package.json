@@ -1,0 +1,14 @@
+{
+  "name": "sdrnexus-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contract validation tooling for SDRNexus",
+  "scripts": {
+    "test": "npm run contracts:validate",
+    "contracts:validate": "node scripts/validate-contracts.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}
