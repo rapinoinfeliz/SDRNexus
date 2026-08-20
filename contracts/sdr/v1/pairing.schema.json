@@ -44,7 +44,7 @@
       "properties": {
         "type": { "const": "pairing.start.response" },
         "deviceCode": { "type": "string", "minLength": 32, "maxLength": 512 },
-        "userCode": { "type": "string", "pattern": "^[A-Z0-9-]{8,12}$" },
+        "userCode": { "type": "string", "pattern": "^DXN-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" },
         "verificationUri": { "type": "string", "format": "uri" },
         "expiresInSeconds": { "type": "integer", "minimum": 60, "maximum": 900 },
         "pollIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 60 }
@@ -80,4 +80,3 @@
     }
   }
 }
-

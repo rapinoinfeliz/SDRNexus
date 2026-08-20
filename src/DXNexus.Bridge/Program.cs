@@ -25,6 +25,8 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     {
         _uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         var menu = new ContextMenuStrip();
+        menu.Items.Add("Connect to DXNexus…", null, (_, _) => ShowPairing());
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
         _notifyIcon = new NotifyIcon
@@ -39,6 +41,12 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _pipeServer.ConnectionChanged += HandleConnectionChanged;
         _pipeServer.MessageReceived += HandleMessageReceived;
         _pipeServer.Start();
+    }
+
+    private static void ShowPairing()
+    {
+        using var form = new PairingForm();
+        form.ShowDialog();
     }
 
     private void HandleConnectionChanged(object? sender, bool connected)

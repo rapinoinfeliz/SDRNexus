@@ -24,8 +24,20 @@ SDR#
 
 ## Current status
 
-Architecture and protocol definition, with a buildable Windows solution
-scaffold. No production plugin binary is available yet.
+Architecture, protocol, a buildable Windows solution, the local named-pipe
+transport, and secure browser-assisted device pairing are implemented. No
+production plugin binary is available yet.
+
+## Pairing the Bridge
+
+1. Start **DXNexus Bridge** on Windows.
+2. From its tray menu choose **Connect to DXNexus…**.
+3. The Bridge creates a device-only P-256 key and opens DXNexus with a
+   ten-minute code.
+4. Sign in and approve it under **Account → Connected devices**.
+5. The private key and device credentials are encrypted for the current
+   Windows user with DPAPI. The SDR# plugin never receives a DXNexus password
+   or cloud token.
 
 ## Development prerequisites
 
