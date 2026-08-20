@@ -12,6 +12,7 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
     private RadioStatePublisher? _publisher;
     private PipeRadioStateSink? _sink;
     private PluginPanel? _panel;
+    private SpectrumOverlayController? _spectrumOverlay;
     private SynchronizationContext? _uiContext;
     private bool _closed;
 
@@ -43,6 +44,7 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _collector = new RadioStateCollector(_host);
         _sink = new PipeRadioStateSink(LocalPipeName.ForCurrentWindowsUser());
         _sink.TuneRequested += HandleTuneRequested;
+        _spectrumOverlay = new SpectrumOverlayController(control, _sink, _uiContext);
         _publisher = new RadioStatePublisher(_collector, _sink);
         _publisher.Start();
     }
@@ -73,7 +75,8 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _panel ??= new PluginPanel(
             _collector ?? throw new InvalidOperationException("DXNexus has not been initialized."),
             _publisher ?? throw new InvalidOperationException("DXNexus has not been initialized."),
-            _sink ?? throw new InvalidOperationException("DXNexus has not been initialized."));
+            _sink ?? throw new InvalidOperationException("DXNexus has not been initialized."),
+            _spectrumOverlay ?? throw new InvalidOperationException("DXNexus has not been initialized."));
     }
 
     public void Close()
@@ -88,6 +91,8 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _panel = null;
         _publisher?.Dispose();
         _publisher = null;
+        _spectrumOverlay?.Dispose();
+        _spectrumOverlay = null;
         if (_sink is not null) _sink.TuneRequested -= HandleTuneRequested;
         _sink = null;
         _collector?.Dispose();

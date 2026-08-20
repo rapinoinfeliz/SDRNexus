@@ -8,6 +8,7 @@ internal sealed class PluginPanel : UserControl
     private readonly RadioStateCollector _collector;
     private readonly RadioStatePublisher _publisher;
     private readonly PipeRadioStateSink _sink;
+    private readonly SpectrumOverlayController _spectrumOverlay;
     private readonly Label _statusLabel;
     private readonly Label _frequencyLabel;
     private readonly Label _modeLabel;
@@ -15,11 +16,12 @@ internal sealed class PluginPanel : UserControl
     private readonly FlowLayoutPanel _candidateList;
     private SequencedRadioSnapshot _latestSnapshot;
 
-    public PluginPanel(RadioStateCollector collector, RadioStatePublisher publisher, PipeRadioStateSink sink)
+    public PluginPanel(RadioStateCollector collector, RadioStatePublisher publisher, PipeRadioStateSink sink, SpectrumOverlayController spectrumOverlay)
     {
         _collector = collector ?? throw new ArgumentNullException(nameof(collector));
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+        _spectrumOverlay = spectrumOverlay ?? throw new ArgumentNullException(nameof(spectrumOverlay));
         AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = Color.FromArgb(15, 31, 43);
         ForeColor = Color.WhiteSmoke;
@@ -32,6 +34,16 @@ internal sealed class PluginPanel : UserControl
             Font = new Font(Font, FontStyle.Bold),
             Text = "DXNexus",
         };
+
+        var spectrumOverlayToggle = new CheckBox
+        {
+            AutoSize = true,
+            Checked = _spectrumOverlay.Enabled,
+            ForeColor = Color.FromArgb(155, 215, 255),
+            Margin = new Padding(0, 8, 0, 0),
+            Text = "Station labels on spectrum",
+        };
+        spectrumOverlayToggle.CheckedChanged += (_, _) => _spectrumOverlay.Enabled = spectrumOverlayToggle.Checked;
 
         _statusLabel = new Label
         {
@@ -81,6 +93,7 @@ internal sealed class PluginPanel : UserControl
         layout.Controls.Add(_statusLabel);
         layout.Controls.Add(_frequencyLabel);
         layout.Controls.Add(_modeLabel);
+        layout.Controls.Add(spectrumOverlayToggle);
         layout.Controls.Add(_candidateStatusLabel);
         layout.Controls.Add(_candidateList);
         Controls.Add(layout);

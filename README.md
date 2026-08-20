@@ -68,6 +68,14 @@ match the current tuner sequence/frequency, is revalidated inside the SDR#
 plugin, and is acknowledged back to the browser. The permission is never
 persisted and returns to locked when the Bridge restarts or the timer expires.
 
+The SDR# plugin can also draw a lightweight local station marker on the
+spectrum analyzer for the current catalog channel. It uses the public
+`SpectrumAnalyzerCustomPaint` API, performs no network or allocation-heavy work
+inside the paint callback, and never uploads FFT, waterfall, IQ, or audio data.
+The panel toggle can disable it instantly. This first prototype labels the
+current exact channel; broader visible-span indexing remains a later, separately
+validated stage.
+
 ## Development prerequisites
 
 - .NET 9 SDK;
