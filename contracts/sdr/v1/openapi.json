@@ -62,6 +62,32 @@
         }
       }
     },
+    "/token/refresh": {
+      "post": {
+        "operationId": "refreshDeviceCredential",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "pairing.schema.json#/$defs/refreshRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rotated device credential",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "pairing.schema.json#/$defs/refreshResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/$defs/problemResponse" },
+          "401": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    },
     "/candidates": {
       "post": {
         "operationId": "getCandidates",
@@ -149,4 +175,3 @@
     }
   }
 }
-

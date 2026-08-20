@@ -6,7 +6,9 @@
     { "$ref": "#/$defs/startRequest" },
     { "$ref": "#/$defs/startResponse" },
     { "$ref": "#/$defs/tokenRequest" },
-    { "$ref": "#/$defs/tokenResponse" }
+    { "$ref": "#/$defs/tokenResponse" },
+    { "$ref": "#/$defs/refreshRequest" },
+    { "$ref": "#/$defs/refreshResponse" }
   ],
   "$defs": {
     "scope": {
@@ -64,6 +66,34 @@
       "required": ["type", "deviceId", "accessToken", "refreshToken", "tokenType", "expiresInSeconds", "scopes"],
       "properties": {
         "type": { "const": "pairing.token.response" },
+        "deviceId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "accessToken": { "type": "string", "minLength": 32, "maxLength": 8192 },
+        "refreshToken": { "type": "string", "minLength": 32, "maxLength": 1024 },
+        "tokenType": { "const": "DPoP" },
+        "expiresInSeconds": { "type": "integer", "minimum": 60, "maximum": 900 },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/scope" }
+        }
+      }
+    },
+    "refreshRequest": {
+      "type": "object",
+      "required": ["type", "refreshToken", "proof"],
+      "properties": {
+        "type": { "const": "token.refresh.request" },
+        "refreshToken": { "type": "string", "minLength": 32, "maxLength": 1024 },
+        "proof": { "type": "string", "minLength": 32, "maxLength": 4096 }
+      }
+    },
+    "refreshResponse": {
+      "type": "object",
+      "required": ["type", "deviceId", "accessToken", "refreshToken", "tokenType", "expiresInSeconds", "scopes"],
+      "properties": {
+        "type": { "const": "token.refresh.response" },
         "deviceId": { "$ref": "common.schema.json#/$defs/uuid" },
         "accessToken": { "type": "string", "minLength": 32, "maxLength": 8192 },
         "refreshToken": { "type": "string", "minLength": 32, "maxLength": 1024 },

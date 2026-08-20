@@ -47,7 +47,7 @@ public sealed class PairingApiClient(HttpClient httpClient)
     {
         ArgumentNullException.ThrowIfNull(pairing);
         var endpoint = new Uri(_httpClient.BaseAddress ?? ProductionBaseUri, "pairing/token");
-        var proof = CreateProof(pairing.PrivateKeyPkcs8, pairing.PublicKey, endpoint, pairing.Start.DeviceCode);
+        var proof = CreateNonceProof(pairing.PrivateKeyPkcs8, pairing.PublicKey, endpoint, pairing.Start.DeviceCode);
         using var response = await _httpClient.PostAsJsonAsync(
             "pairing/token",
             new { type = "pairing.token.request", deviceCode = pairing.Start.DeviceCode, proof },
@@ -76,7 +76,7 @@ public sealed class PairingApiClient(HttpClient httpClient)
             pairing.PrivateKeyPkcs8.ToArray());
     }
 
-    public static string CreateProof(
+    public static string CreateNonceProof(
         byte[] privateKeyPkcs8,
         PublicDeviceJwk publicJwk,
         Uri endpoint,
@@ -102,6 +102,43 @@ public sealed class PairingApiClient(HttpClient httpClient)
         }, JsonOptions));
         using var key = ECDsa.Create();
         key.ImportPkcs8PrivateKey(privateKeyPkcs8, out _);
+        var signature = key.SignData(
+            Encoding.ASCII.GetBytes($"{header}.{payload}"),
+            HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        return $"{header}.{payload}.{Base64Url(signature)}";
+    }
+
+    public static string CreateAccessProof(
+        byte[] privateKeyPkcs8,
+        Uri endpoint,
+        HttpMethod method,
+        string accessToken,
+        DateTimeOffset? now = null,
+        string? jti = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
+        using var key = ECDsa.Create();
+        key.ImportPkcs8PrivateKey(privateKeyPkcs8, out _);
+        var parameters = key.ExportParameters(false);
+        var publicJwk = new PublicDeviceJwk(
+            "EC",
+            "P-256",
+            Base64Url(parameters.Q.X ?? throw new CryptographicException("Missing P-256 X coordinate.")),
+            Base64Url(parameters.Q.Y ?? throw new CryptographicException("Missing P-256 Y coordinate.")));
+        var header = Base64Url(JsonSerializer.SerializeToUtf8Bytes(
+            new { alg = "ES256", typ = "dpop+jwt", jwk = publicJwk }, JsonOptions));
+        var proofTime = now ?? DateTimeOffset.UtcNow;
+        var canonicalEndpoint = endpoint.GetLeftPart(UriPartial.Authority) + endpoint.AbsolutePath;
+        var accessTokenHash = SHA256.HashData(Encoding.ASCII.GetBytes(accessToken));
+        var payload = Base64Url(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            htm = method.Method.ToUpperInvariant(),
+            htu = canonicalEndpoint,
+            iat = proofTime.ToUnixTimeSeconds(),
+            jti = jti ?? Guid.NewGuid().ToString(),
+            ath = Base64Url(accessTokenHash),
+        }, JsonOptions));
         var signature = key.SignData(
             Encoding.ASCII.GetBytes($"{header}.{payload}"),
             HashAlgorithmName.SHA256,
