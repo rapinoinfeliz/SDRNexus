@@ -26,8 +26,9 @@ SDR#
 
 Architecture, protocol, a buildable Windows solution, the bidirectional local
 named-pipe transport, secure browser-assisted device pairing, rotating DPoP
-credentials, and exact-frequency station candidates are implemented. No
-production plugin binary is available yet.
+credentials, exact-frequency station candidates, offline-safe explicit actions,
+and the optional live browser companion are implemented. Release artifacts are
+test packages until the real SDR#/Airspy compatibility gates are completed.
 
 ## Pairing the Bridge
 
@@ -53,6 +54,12 @@ Explicit log and wishlist mutations use client-generated idempotency IDs. If
 DXNexus is temporarily unavailable, the Bridge stores them in a per-user local
 SQLite queue and retries with bounded exponential backoff. Transient tuner,
 signal and RDS snapshots are never queued as listening history.
+
+The tray option **Live browser companion** is off by default and remembered per
+Windows user. When enabled, Account → Connected devices shows the current SDR#
+frequency and up to six exact-channel candidates through a private outgoing
+WebSocket. The relay is ephemeral: it does not store VFO state in D1/R2 and does
+not transmit audio, IQ, FFT, waterfall, hardware serials, or listening history.
 
 ## Development prerequisites
 

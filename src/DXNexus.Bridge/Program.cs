@@ -26,10 +26,16 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private readonly DeviceCredentialStore _credentialStore;
     private readonly BridgePreferencesStore _preferencesStore;
     private readonly OfflineMutationQueue _offlineQueue;
+    private readonly LiveCompanionClient _liveCompanion;
+    private readonly ToolStripMenuItem _liveMenu;
     private readonly SemaphoreSlim _syncGate = new(1, 1);
     private readonly System.Threading.Timer _syncTimer;
+    private readonly System.Threading.Timer _liveHeartbeatTimer;
     private CancellationTokenSource? _candidateQuery;
     private ReceptionSetupContext? _receptionSetup;
+    private SequencedRadioSnapshot? _latestRadioSnapshot;
+    private CandidateContextResponse? _latestCandidateContext;
+    private volatile bool _liveEnabled;
 
     public BridgeApplicationContext()
     {
@@ -39,9 +45,13 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _offlineQueue = new OfflineMutationQueue();
         _httpClient = new HttpClient { BaseAddress = PairingApiClient.ProductionBaseUri };
         _apiClient = new AuthenticatedDeviceApiClient(_httpClient, _credentialStore);
+        _liveCompanion = new LiveCompanionClient(_apiClient);
         var menu = new ContextMenuStrip();
         menu.Items.Add("Connect to DXNexus…", null, (_, _) => ShowPairing());
         menu.Items.Add("Reception setup…", null, (_, _) => ShowReceptionSetup());
+        _liveMenu = new ToolStripMenuItem("Live browser companion") { CheckOnClick = true };
+        _liveMenu.CheckedChanged += (_, _) => _ = SetLiveCompanionAsync(_liveMenu.Checked);
+        menu.Items.Add(_liveMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
@@ -58,6 +68,43 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _pipeServer.MessageReceived += HandleMessageReceived;
         _pipeServer.Start();
         _syncTimer = new System.Threading.Timer(_ => _ = SynchronizeOfflineMutationsAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
+        _liveHeartbeatTimer = new System.Threading.Timer(_ => _ = PublishLiveStateAsync(), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+        _ = InitializePreferencesAsync();
+    }
+
+    private async Task InitializePreferencesAsync()
+    {
+        try
+        {
+            var preferences = await _preferencesStore.LoadAsync().ConfigureAwait(false);
+            _liveEnabled = preferences.LiveBrowserCompanion;
+            _uiContext.Post(_ => _liveMenu.Checked = _liveEnabled, null);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            _liveEnabled = false;
+        }
+    }
+
+    private async Task SetLiveCompanionAsync(bool enabled)
+    {
+        try
+        {
+            _liveEnabled = enabled;
+            var preferences = await _preferencesStore.LoadAsync().ConfigureAwait(false);
+            if (preferences.LiveBrowserCompanion != enabled)
+                await _preferencesStore.SaveAsync(preferences with { LiveBrowserCompanion = enabled }).ConfigureAwait(false);
+            if (enabled) await PublishLiveStateAsync().ConfigureAwait(false);
+            else await _liveCompanion.DisconnectAsync().ConfigureAwait(false);
+        }
+        catch (Exception error) when (IsTransient(error) || error is IOException or UnauthorizedAccessException)
+        {
+            _uiContext.Post(_ => _notifyIcon.ShowBalloonTip(
+                4_000,
+                "DXNexus live companion",
+                "The live connection could not be changed. Check the network and try again.",
+                ToolTipIcon.Warning), null);
+        }
     }
 
     private static void ShowPairing()
@@ -104,11 +151,15 @@ internal sealed class BridgeApplicationContext : ApplicationContext
             return;
         }
 
+        _latestRadioSnapshot = snapshot;
+        _latestCandidateContext = null;
+
         _uiContext.Post(_ =>
         {
             _notifyIcon.Text = $"DXNexus — {FormatFrequency(snapshot.Radio.FrequencyHz)}";
         }, null);
         _ = RefreshCandidatesAsync(snapshot);
+        _ = PublishLiveStateAsync();
     }
 
     private async Task ApplyWishlistCommandAsync(WishlistCommand command, long sequence)
@@ -264,6 +315,8 @@ internal sealed class BridgeApplicationContext : ApplicationContext
             || http.StatusCode == System.Net.HttpStatusCode.RequestTimeout
             || http.StatusCode == System.Net.HttpStatusCode.TooManyRequests
             || (int)http.StatusCode >= 500,
+        System.Net.WebSockets.WebSocketException => true,
+        IOException => true,
         _ => false,
     };
 
@@ -292,8 +345,10 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                 20), query.Token).ConfigureAwait(false);
             if (!query.IsCancellationRequested)
             {
+                _latestCandidateContext = CompactLiveCandidates(response);
                 await _pipeServer.SendAsync("context.candidates", response.Sequence, response, query.Token)
                     .ConfigureAwait(false);
+                await PublishLiveStateAsync(query.Token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (query.IsCancellationRequested)
@@ -315,6 +370,40 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         }
     }
 
+    private static CandidateContextResponse CompactLiveCandidates(CandidateContextResponse response) => response with
+    {
+        Candidates = response.Candidates.Take(6).ToArray(),
+        NextCursor = null,
+    };
+
+    private async Task PublishLiveStateAsync(CancellationToken cancellationToken = default)
+    {
+        var snapshot = _latestRadioSnapshot;
+        if (!_liveEnabled || snapshot is null || !_credentialStore.Exists) return;
+        try
+        {
+            var state = new LiveBrowserState(
+                "live.state",
+                Protocol.Version,
+                snapshot.Sequence,
+                DateTimeOffset.UtcNow,
+                snapshot,
+                _latestCandidateContext);
+            try
+            {
+                await _liveCompanion.PublishAsync(state, cancellationToken).ConfigureAwait(false);
+            }
+            catch (InvalidDataException) when (state.Candidates is not null)
+            {
+                await _liveCompanion.PublishAsync(state with { Candidates = null }, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception error) when (IsTransient(error) || error is InvalidOperationException)
+        {
+            // Live state is transient. A later snapshot or heartbeat reconnects; it is never queued.
+        }
+    }
+
     private static string FormatFrequency(long frequencyHz) => frequencyHz >= 1_000_000
         ? $"{frequencyHz / 1_000_000d:0.000} MHz"
         : $"{frequencyHz / 1_000d:0.0} kHz";
@@ -325,9 +414,11 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _candidateQuery?.Cancel();
         _candidateQuery?.Dispose();
         _syncTimer.Dispose();
+        _liveHeartbeatTimer.Dispose();
         _pipeServer.ConnectionChanged -= HandleConnectionChanged;
         _pipeServer.MessageReceived -= HandleMessageReceived;
         _pipeServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _liveCompanion.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _apiClient.Dispose();
         _offlineQueue.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _syncGate.Dispose();

@@ -92,7 +92,8 @@ internal sealed class ReceptionSetupForm : Form
         if (_listeningPoint.SelectedItem is not SavedListeningPoint point
             || _receiver.SelectedItem is not SavedReceiverProfile receiver) return;
         _save.Enabled = false;
-        await _preferencesStore.SaveAsync(new BridgePreferences(point.Id, receiver.Id));
+        var existing = await _preferencesStore.LoadAsync();
+        await _preferencesStore.SaveAsync(existing with { ListeningPointId = point.Id, ReceiverProfileId = receiver.Id });
         SelectedSetup = new ReceptionSetupContext(point.Id, receiver.Id);
         DialogResult = DialogResult.OK;
         Close();

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/live-state.schema.json",
+  "title": "Ephemeral browser companion state",
+  "type": "object",
+  "required": ["type", "protocol", "sequence", "generatedAt", "snapshot"],
+  "properties": {
+    "type": { "const": "live.state" },
+    "protocol": { "const": "1.0" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "generatedAt": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+    "snapshot": {
+      "type": "object",
+      "required": ["sequence", "capturedAtUtc", "radio"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "capturedAtUtc": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
+        "radio": {
+          "type": "object",
+          "required": ["frequencyHz", "centerFrequencyHz", "detector", "filterBandwidthHz", "playing", "signal", "rds"],
+          "properties": {
+            "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+            "centerFrequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+            "detector": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+            "filterBandwidthHz": { "$ref": "common.schema.json#/$defs/bandwidthHz" },
+            "rfDisplayBandwidthHz": { "$ref": "common.schema.json#/$defs/bandwidthHz" },
+            "inputSampleRateHz": { "type": "integer", "minimum": 0 },
+            "playing": { "type": "boolean" },
+            "sourceName": { "type": ["string", "null"], "maxLength": 120 },
+            "signal": { "type": "object" },
+            "rds": { "type": "object" }
+          }
+        }
+      }
+    },
+    "candidates": {
+      "oneOf": [
+        { "$ref": "candidate-response.schema.json" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

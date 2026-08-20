@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -59,6 +60,31 @@ public sealed class AuthenticatedDeviceApiClient(
 
     public async Task<Guid> GetDeviceIdAsync(CancellationToken cancellationToken = default) =>
         (await CurrentCredentialAsync(cancellationToken).ConfigureAwait(false)).DeviceId;
+
+    public async Task<WebSocketAuthentication> PrepareLiveWebSocketAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var credential = await CurrentCredentialAsync(cancellationToken).ConfigureAwait(false);
+        if (credential.AccessTokenExpiresAt <= DateTimeOffset.UtcNow.AddSeconds(30))
+        {
+            credential = await RefreshAsync(credential, cancellationToken).ConfigureAwait(false);
+        }
+        var httpEndpoint = new Uri(_httpClient.BaseAddress ?? PairingApiClient.ProductionBaseUri, "live/bridge");
+        var socketBuilder = new UriBuilder(httpEndpoint)
+        {
+            Scheme = httpEndpoint.Scheme == Uri.UriSchemeHttps ? "wss" : "ws",
+            Port = httpEndpoint.IsDefaultPort ? -1 : httpEndpoint.Port,
+        };
+        return new WebSocketAuthentication(
+            socketBuilder.Uri,
+            $"DPoP {credential.AccessToken}",
+            PairingApiClient.CreateAccessProof(
+                credential.PrivateKeyPkcs8,
+                httpEndpoint,
+                HttpMethod.Get,
+                credential.AccessToken),
+            credential.AccessTokenExpiresAt);
+    }
 
     public async Task<WishlistMutationResponse> SetWishlistAsync(
         WishlistMutationRequest request,
@@ -208,3 +234,9 @@ public sealed record DeviceConnectionPrincipal(
     Guid UserId,
     string DeviceName,
     string[] Scopes);
+
+public sealed record WebSocketAuthentication(
+    Uri Endpoint,
+    string Authorization,
+    string Dpop,
+    DateTimeOffset ExpiresAt);

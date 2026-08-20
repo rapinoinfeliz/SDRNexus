@@ -34,6 +34,7 @@ const fixtures = [
   ["pairing-start-request.json", "pairing.schema.json"],
   ["logbook-create.json", "logbook-create.schema.json"],
   ["wishlist-mutation.json", "wishlist-mutation.schema.json"],
+  ["live-state.json", "live-state.schema.json"],
 ];
 
 for (const [exampleName, schemaName] of fixtures) {

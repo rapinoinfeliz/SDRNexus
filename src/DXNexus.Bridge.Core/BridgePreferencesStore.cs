@@ -3,7 +3,7 @@ using DXNexus.Contracts;
 
 namespace DXNexus.Bridge.Core;
 
-public sealed record BridgePreferences(Guid? ListeningPointId, Guid? ReceiverProfileId)
+public sealed record BridgePreferences(Guid? ListeningPointId, Guid? ReceiverProfileId, bool LiveBrowserCompanion = false)
 {
     public ReceptionSetupContext? ReceptionSetup => ListeningPointId is Guid point && ReceiverProfileId is Guid receiver
         ? new ReceptionSetupContext(point, receiver)
@@ -20,16 +20,16 @@ public sealed class BridgePreferencesStore(string? filePath = null)
 
     public async Task<BridgePreferences> LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(_filePath)) return new BridgePreferences(null, null);
+        if (!File.Exists(_filePath)) return new BridgePreferences(null, null, false);
         try
         {
             await using var input = File.OpenRead(_filePath);
             return await JsonSerializer.DeserializeAsync<BridgePreferences>(input, JsonOptions, cancellationToken)
-                .ConfigureAwait(false) ?? new BridgePreferences(null, null);
+                .ConfigureAwait(false) ?? new BridgePreferences(null, null, false);
         }
         catch (JsonException)
         {
-            return new BridgePreferences(null, null);
+            return new BridgePreferences(null, null, false);
         }
     }
 

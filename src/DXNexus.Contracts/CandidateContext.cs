@@ -159,3 +159,11 @@ public sealed record QuickLogCommand(
     SequencedRadioSnapshot Snapshot);
 
 public sealed record CommandResult(Guid ClientMutationId, string Action, bool Success, string Message);
+
+public sealed record LiveBrowserState(
+    string Type,
+    string Protocol,
+    long Sequence,
+    DateTimeOffset GeneratedAt,
+    SequencedRadioSnapshot Snapshot,
+    CandidateContextResponse? Candidates);

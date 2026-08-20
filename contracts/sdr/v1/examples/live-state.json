@@ -1,0 +1,29 @@
+{
+  "type": "live.state",
+  "protocol": "1.0",
+  "sequence": 42,
+  "generatedAt": "2026-08-20T23:04:00Z",
+  "snapshot": {
+    "sequence": 42,
+    "capturedAtUtc": "2026-08-20T23:03:59Z",
+    "radio": {
+      "frequencyHz": 98900000,
+      "centerFrequencyHz": 99000000,
+      "detector": "wfm",
+      "filterBandwidthHz": 180000,
+      "rfDisplayBandwidthHz": 768000,
+      "inputSampleRateHz": 768000,
+      "playing": true,
+      "sourceName": "Airspy HF+ Discovery",
+      "signal": {
+        "visualSnrDb": 22.4,
+        "visualPeakDb": -35.2,
+        "visualFloorDb": -57.6,
+        "source": "sdrsharp.visual",
+        "calibrated": false
+      },
+      "rds": { "pi": "9341", "ps": "MOVIMENTO", "rt": null }
+    }
+  },
+  "candidates": null
+}

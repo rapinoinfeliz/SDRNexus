@@ -170,6 +170,17 @@
           "401": { "$ref": "#/$defs/problemResponse" }
         }
       }
+    },
+    "/live/bridge": {
+      "get": {
+        "operationId": "connectBridgeLiveRelay",
+        "description": "Upgrades to a device-authenticated WebSocket. State is ephemeral and is never queued or persisted.",
+        "security": [{ "deviceDPoP": [] }],
+        "responses": {
+          "101": { "description": "WebSocket upgraded; client messages satisfy live-state.schema.json" },
+          "401": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
     }
   },
   "components": {
