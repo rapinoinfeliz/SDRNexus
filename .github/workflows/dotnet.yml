@@ -4,8 +4,11 @@ on:
   push:
     paths:
       - "src/**"
+      - "tests/**"
       - "eng/**"
       - "scripts/fetch-sdrsharp-sdk.sh"
+      - "scripts/package-release.ps1"
+      - "installer/**"
       - "Directory.Build.props"
       - "global.json"
       - "SDRNexus.sln"
@@ -13,8 +16,11 @@ on:
   pull_request:
     paths:
       - "src/**"
+      - "tests/**"
       - "eng/**"
       - "scripts/fetch-sdrsharp-sdk.sh"
+      - "scripts/package-release.ps1"
+      - "installer/**"
       - "Directory.Build.props"
       - "global.json"
       - "SDRNexus.sln"
@@ -41,3 +47,12 @@ jobs:
       - run: dotnet restore SDRNexus.sln
       - run: dotnet build SDRNexus.sln --configuration Release --no-restore
       - run: dotnet test SDRNexus.sln --configuration Release --no-build
+      - name: Build Windows test package
+        shell: pwsh
+        run: ./scripts/package-release.ps1 -Configuration Release -Runtime win-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SDRNexus-windows-x64
+          path: artifacts/SDRNexus-0.1.0-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14

@@ -74,6 +74,22 @@ dotnet build SDRNexus.sln
 npm test
 ```
 
+## Windows test package
+
+Every successful `.NET` workflow produces a 14-day `SDRNexus-windows-x64`
+artifact. Extract it, open PowerShell in the extracted directory, and run:
+
+```powershell
+.\install.ps1 -SdrSharpPath "C:\path\to\sdrsharp-x86"
+```
+
+The installer reads `core.pluginsDirectory` from `SDRSharp.config`, copies only
+the four SDRNexus plugin assemblies there, installs the per-user Bridge under
+`LocalAppData\Programs`, and optionally starts it with Windows. SDR# must be
+closed. The package contains SHA-256 checksums and never redistributes SDR# or
+Airspy binaries. This remains a test package until the compatibility gates are
+completed on Windows with real SDR# hardware.
+
 ## Important boundaries
 
 - No DXNexus password is stored by the plugin.

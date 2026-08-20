@@ -7,6 +7,9 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Authors>DXNexus</Authors>
+    <RepositoryUrl>https://github.com/rapinoinfeliz/SDRNexus</RepositoryUrl>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -14,4 +17,3 @@
     <SdrSharpSdkDirectory Condition="'$(SdrSharpSdkDirectory)' == ''">$(MSBuildThisFileDirectory).sdk</SdrSharpSdkDirectory>
   </PropertyGroup>
 </Project>
-
