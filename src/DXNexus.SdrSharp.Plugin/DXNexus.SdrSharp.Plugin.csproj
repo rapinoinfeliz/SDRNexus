@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DXNexus.Contracts\DXNexus.Contracts.csproj" />
+    <ProjectReference Include="..\DXNexus.Plugin.Core\DXNexus.Plugin.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,4 +36,3 @@
     </Reference>
   </ItemGroup>
 </Project>
-

@@ -40,4 +40,4 @@ jobs:
         run: ./scripts/fetch-sdrsharp-sdk.sh
       - run: dotnet restore SDRNexus.sln
       - run: dotnet build SDRNexus.sln --configuration Release --no-restore
-
+      - run: dotnet test SDRNexus.sln --configuration Release --no-build

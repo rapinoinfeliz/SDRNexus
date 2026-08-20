@@ -1,10 +1,13 @@
 using SDRSharp.Common;
+using DXNexus.Plugin.Core;
 
 namespace DXNexus.SdrSharp.Plugin;
 
 public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatus, IExtendedNameProvider
 {
     private ISharpControl? _control;
+    private SdrSharpHostAdapter? _host;
+    private RadioStateCollector? _collector;
     private PluginPanel? _panel;
     private bool _closed;
 
@@ -31,12 +34,14 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         }
 
         _control = control;
+        _host = new SdrSharpHostAdapter(control);
+        _collector = new RadioStateCollector(_host);
     }
 
     public void LoadGui()
     {
         ObjectDisposedException.ThrowIf(_closed, this);
-        _panel ??= new PluginPanel(_control ?? throw new InvalidOperationException("DXNexus has not been initialized."));
+        _panel ??= new PluginPanel(_collector ?? throw new InvalidOperationException("DXNexus has not been initialized."));
     }
 
     public void Close()
@@ -49,7 +54,9 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _closed = true;
         _panel?.Dispose();
         _panel = null;
+        _collector?.Dispose();
+        _collector = null;
+        _host = null;
         _control = null;
     }
 }
-

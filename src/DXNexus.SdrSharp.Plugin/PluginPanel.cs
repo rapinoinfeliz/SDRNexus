@@ -1,15 +1,16 @@
-using SDRSharp.Common;
+using DXNexus.Plugin.Core;
 
 namespace DXNexus.SdrSharp.Plugin;
 
 internal sealed class PluginPanel : UserControl
 {
-    private readonly ISharpControl _control;
+    private readonly RadioStateCollector _collector;
     private readonly Label _frequencyLabel;
+    private readonly Label _modeLabel;
 
-    public PluginPanel(ISharpControl control)
+    public PluginPanel(RadioStateCollector collector)
     {
-        _control = control ?? throw new ArgumentNullException(nameof(control));
+        _collector = collector ?? throw new ArgumentNullException(nameof(collector));
         AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = Color.FromArgb(15, 31, 43);
         ForeColor = Color.WhiteSmoke;
@@ -34,7 +35,12 @@ internal sealed class PluginPanel : UserControl
         {
             AutoSize = true,
             Margin = new Padding(0, 18, 0, 0),
-            Text = FormatFrequency(_control.Frequency),
+        };
+
+        _modeLabel = new Label
+        {
+            AutoSize = true,
+            ForeColor = Color.FromArgb(170, 185, 195),
         };
 
         var description = new Label
@@ -56,8 +62,34 @@ internal sealed class PluginPanel : UserControl
         layout.Controls.Add(title);
         layout.Controls.Add(status);
         layout.Controls.Add(_frequencyLabel);
+        layout.Controls.Add(_modeLabel);
         layout.Controls.Add(description);
         Controls.Add(layout);
+
+        _collector.SnapshotChanged += HandleSnapshotChanged;
+        Render(_collector.CaptureFullSnapshot());
+    }
+
+    private void HandleSnapshotChanged(object? sender, SequencedRadioSnapshot snapshot)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => Render(snapshot));
+            return;
+        }
+
+        Render(snapshot);
+    }
+
+    private void Render(SequencedRadioSnapshot snapshot)
+    {
+        _frequencyLabel.Text = FormatFrequency(snapshot.Radio.FrequencyHz);
+        _modeLabel.Text = $"{snapshot.Radio.Detector.ToString().ToUpperInvariant()} · {snapshot.Radio.FilterBandwidthHz / 1_000d:0.#} kHz";
     }
 
     private static string FormatFrequency(long frequencyHz)
@@ -65,6 +97,16 @@ internal sealed class PluginPanel : UserControl
         return frequencyHz >= 1_000_000
             ? $"{frequencyHz / 1_000_000d:0.000} MHz"
             : $"{frequencyHz / 1_000d:0.0} kHz";
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _collector.SnapshotChanged -= HandleSnapshotChanged;
+        }
+
+        base.Dispose(disposing);
     }
 }
 
