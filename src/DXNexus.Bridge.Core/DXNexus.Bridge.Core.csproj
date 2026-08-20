@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Description>Local networking, pairing, and offline services for the DXNexus Bridge.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DXNexus.Contracts\DXNexus.Contracts.csproj" />
+  </ItemGroup>
+</Project>
+

@@ -1,0 +1,43 @@
+name: .NET
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "eng/**"
+      - "scripts/fetch-sdrsharp-sdk.sh"
+      - "Directory.Build.props"
+      - "global.json"
+      - "SDRNexus.sln"
+      - ".github/workflows/dotnet.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "eng/**"
+      - "scripts/fetch-sdrsharp-sdk.sh"
+      - "Directory.Build.props"
+      - "global.json"
+      - "SDRNexus.sln"
+      - ".github/workflows/dotnet.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch pinned SDR# SDK reference assemblies
+        shell: bash
+        run: ./scripts/fetch-sdrsharp-sdk.sh
+      - run: dotnet restore SDRNexus.sln
+      - run: dotnet build SDRNexus.sln --configuration Release --no-restore
+

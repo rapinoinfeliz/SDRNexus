@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Description>Per-user Windows companion for SDRNexus.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DXNexus.Bridge.Core\DXNexus.Bridge.Core.csproj" />
+  </ItemGroup>
+</Project>
+

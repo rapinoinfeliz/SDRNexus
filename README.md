@@ -24,7 +24,28 @@ SDR#
 
 ## Current status
 
-Architecture definition. No production plugin binary is available yet.
+Architecture and protocol definition, with a buildable Windows solution
+scaffold. No production plugin binary is available yet.
+
+## Development prerequisites
+
+- .NET 9 SDK;
+- Node.js 22 for contract validation;
+- the pinned official SDR# SDK reference assemblies.
+
+Install only the required SDK reference assemblies into the ignored `.sdk`
+directory:
+
+```bash
+./scripts/fetch-sdrsharp-sdk.sh
+```
+
+Then build:
+
+```bash
+dotnet build SDRNexus.sln
+npm test
+```
 
 ## Important boundaries
 
@@ -32,4 +53,3 @@ Architecture definition. No production plugin binary is available yet.
 - No raw IQ, spectrum, waterfall, or audio is uploaded automatically.
 - SDR# display readings are not represented as calibrated dBm or dBuV.
 - SDR# and Airspy assemblies are not redistributed by this repository.
-

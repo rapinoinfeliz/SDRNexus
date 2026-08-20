@@ -1,0 +1,12 @@
+{
+  "source": "https://airspy.com/?ddownload=5944",
+  "sha256": "9680d85714a14f53b046b5651664a10153604cc91d85f18b3eb9580e703b8935",
+  "observedSdrSharpRevision": 1921,
+  "observedAtUtc": "2026-08-20T00:00:00Z",
+  "requiredAssemblies": [
+    "SDRSharp.Common.dll",
+    "SDRSharp.PanView.dll",
+    "SDRSharp.Radio.dll"
+  ]
+}
+

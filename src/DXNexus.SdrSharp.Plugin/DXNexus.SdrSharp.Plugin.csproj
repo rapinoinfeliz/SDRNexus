@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Description>Thin SDR# host adapter and DXNexus panel.</Description>
+  </PropertyGroup>
+
+  <Target Name="RequireSdrSharpSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(SdrSharpSdkDirectory)\SDRSharp.Common.dll')"
+           Text="SDRSharp.Common.dll was not found. Set SDRSHARP_SDK_DIR or run scripts/fetch-sdrsharp-sdk.sh." />
+    <Error Condition="!Exists('$(SdrSharpSdkDirectory)\SDRSharp.PanView.dll')"
+           Text="SDRSharp.PanView.dll was not found. Set SDRSHARP_SDK_DIR or run scripts/fetch-sdrsharp-sdk.sh." />
+    <Error Condition="!Exists('$(SdrSharpSdkDirectory)\SDRSharp.Radio.dll')"
+           Text="SDRSharp.Radio.dll was not found. Set SDRSHARP_SDK_DIR or run scripts/fetch-sdrsharp-sdk.sh." />
+  </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DXNexus.Contracts\DXNexus.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="SDRSharp.Common">
+      <HintPath>$(SdrSharpSdkDirectory)\SDRSharp.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SDRSharp.PanView">
+      <HintPath>$(SdrSharpSdkDirectory)\SDRSharp.PanView.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SDRSharp.Radio">
+      <HintPath>$(SdrSharpSdkDirectory)\SDRSharp.Radio.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
+
