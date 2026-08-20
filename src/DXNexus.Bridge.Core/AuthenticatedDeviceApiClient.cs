@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using DXNexus.Contracts;
 
 namespace DXNexus.Bridge.Core;
 
@@ -25,6 +27,34 @@ public sealed class AuthenticatedDeviceApiClient(
         return await response.Content.ReadFromJsonAsync<DeviceConnectionStatus>(JsonOptions, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidDataException("DXNexus returned an empty device status.");
+    }
+
+    public async Task<ReceptionSetupResponse> GetReceptionSetupAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAsync(
+            () => new HttpRequestMessage(HttpMethod.Get, "setup"),
+            cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ReceptionSetupResponse>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidDataException("DXNexus returned an empty reception setup.");
+    }
+
+    public async Task<CandidateContextResponse> GetCandidatesAsync(
+        CandidateContextRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = JsonSerializer.Serialize(request, JsonOptions);
+        using var response = await SendAsync(
+            () => new HttpRequestMessage(HttpMethod.Post, "candidates")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+            },
+            cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CandidateContextResponse>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidDataException("DXNexus returned an empty candidate response.");
     }
 
     public async Task<HttpResponseMessage> SendAsync(

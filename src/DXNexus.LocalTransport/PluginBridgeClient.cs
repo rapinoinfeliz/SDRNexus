@@ -8,6 +8,8 @@ public sealed class PluginBridgeClient : IAsyncDisposable
     private readonly string _pipeName;
     private NamedPipeClientStream? _pipe;
     private string? _sessionNonce;
+    private CancellationTokenSource? _receiveStop;
+    private Task? _receiveTask;
 
     public PluginBridgeClient(string pipeName)
     {
@@ -16,6 +18,7 @@ public sealed class PluginBridgeClient : IAsyncDisposable
     }
 
     public bool IsConnected => _pipe?.IsConnected == true;
+    public event EventHandler<PipeEnvelope>? MessageReceived;
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
@@ -40,12 +43,37 @@ public sealed class PluginBridgeClient : IAsyncDisposable
             }
 
             _pipe = pipe;
+            _receiveStop = new CancellationTokenSource();
+            _receiveTask = ReceiveAsync(pipe, _sessionNonce, _receiveStop.Token);
         }
         catch
         {
             await pipe.DisposeAsync().ConfigureAwait(false);
             _sessionNonce = null;
             throw;
+        }
+    }
+
+    private async Task ReceiveAsync(NamedPipeClientStream pipe, string sessionNonce, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (pipe.IsConnected && !cancellationToken.IsCancellationRequested)
+            {
+                var message = await PipeFrameCodec.ReadAsync(pipe, cancellationToken).ConfigureAwait(false);
+                if (message is null) return;
+                if (message.Protocol != Contracts.Protocol.Version || message.SessionNonce != sessionNonce)
+                {
+                    throw new InvalidDataException("The Bridge changed protocol or session nonce.");
+                }
+                MessageReceived?.Invoke(this, message);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (IOException)
+        {
         }
     }
 
@@ -66,15 +94,27 @@ public sealed class PluginBridgeClient : IAsyncDisposable
 
     private async ValueTask DisposePipeAsync()
     {
+        if (_receiveStop is not null)
+        {
+            await _receiveStop.CancelAsync().ConfigureAwait(false);
+        }
         if (_pipe is not null)
         {
             await _pipe.DisposeAsync().ConfigureAwait(false);
             _pipe = null;
         }
 
+        if (_receiveTask is not null)
+        {
+            try { await _receiveTask.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+        }
+
         _sessionNonce = null;
+        _receiveTask = null;
+        _receiveStop?.Dispose();
+        _receiveStop = null;
     }
 
     public ValueTask DisposeAsync() => DisposePipeAsync();
 }
-

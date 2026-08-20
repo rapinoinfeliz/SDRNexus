@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/setup-response.schema.json",
+  "title": "Saved reception setup",
+  "type": "object",
+  "required": ["protocol", "listeningPoints", "receivers"],
+  "properties": {
+    "protocol": { "const": "1.0" },
+    "listeningPoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "latitude", "longitude", "isDefault"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/uuid" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+          "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+          "isDefault": { "type": "boolean" }
+        }
+      }
+    },
+    "receivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "isDefault"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/uuid" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "brand": { "type": ["string", "null"], "maxLength": 120 },
+          "model": { "type": ["string", "null"], "maxLength": 120 },
+          "antenna": { "type": ["string", "null"], "maxLength": 160 },
+          "isDefault": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

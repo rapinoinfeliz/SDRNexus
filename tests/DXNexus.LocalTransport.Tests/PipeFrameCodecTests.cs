@@ -71,4 +71,28 @@ public sealed class PipeFrameCodecTests
         Assert.Equal(7, message.Sequence);
         Assert.Equal(101_700_000L, message.Payload.GetProperty("frequencyHz").GetInt64());
     }
+
+    [Fact]
+    public async Task BridgeCanReturnCandidateContextOverTheAuthenticatedPipeSession()
+    {
+        var pipeName = $"dxn-{Guid.NewGuid():N}"[..12];
+        await using var server = new BridgePipeServer(pipeName);
+        await using var client = new PluginBridgeClient(pipeName);
+        var received = new TaskCompletionSource<PipeEnvelope>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.MessageReceived += (_, message) => received.TrySetResult(message);
+        server.Start();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await client.ConnectAsync(timeout.Token);
+        Assert.True(await server.SendAsync(
+            "context.candidates",
+            9,
+            new { frequencyHz = 92_300_000L, candidates = new[] { new { stationName = "Band FM" } } },
+            timeout.Token));
+        var message = await received.Task.WaitAsync(timeout.Token);
+
+        Assert.Equal("context.candidates", message.Type);
+        Assert.Equal(9, message.Sequence);
+        Assert.Equal("Band FM", message.Payload.GetProperty("candidates")[0].GetProperty("stationName").GetString());
+    }
 }

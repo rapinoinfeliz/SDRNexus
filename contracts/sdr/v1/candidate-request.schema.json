@@ -10,6 +10,7 @@
     "sequence": { "type": "integer", "minimum": 0 },
     "timestampUtc": { "$ref": "common.schema.json#/$defs/utcTimestamp" },
     "frequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
+    "band": { "type": "string", "enum": ["FM", "AM", "SW"] },
     "centerFrequencyHz": { "$ref": "common.schema.json#/$defs/frequencyHz" },
     "detector": { "$ref": "common.schema.json#/$defs/detector" },
     "filterBandwidthHz": { "$ref": "common.schema.json#/$defs/bandwidthHz" },
@@ -31,4 +32,3 @@
     "cursor": { "type": "string", "maxLength": 256 }
   }
 }
-

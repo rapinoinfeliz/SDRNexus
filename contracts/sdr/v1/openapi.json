@@ -115,6 +115,23 @@
         }
       }
     },
+    "/setup": {
+      "get": {
+        "operationId": "getReceptionSetup",
+        "security": [{ "deviceDPoP": [] }],
+        "responses": {
+          "200": {
+            "description": "Saved listening points and receiver profiles",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "setup-response.schema.json" }
+              }
+            }
+          },
+          "401": { "$ref": "#/$defs/problemResponse" }
+        }
+      }
+    },
     "/logbook": {
       "post": {
         "operationId": "createLogbookEntry",

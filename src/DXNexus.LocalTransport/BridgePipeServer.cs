@@ -6,7 +6,11 @@ public sealed class BridgePipeServer : IAsyncDisposable
 {
     private readonly string _pipeName;
     private readonly CancellationTokenSource _stop = new();
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly object _connectionGate = new();
     private Task? _runTask;
+    private NamedPipeServerStream? _activePipe;
+    private string? _activeSessionNonce;
 
     public BridgePipeServer(string pipeName)
     {
@@ -48,6 +52,14 @@ public sealed class BridgePipeServer : IAsyncDisposable
             }
             finally
             {
+                lock (_connectionGate)
+                {
+                    if (ReferenceEquals(_activePipe, pipe))
+                    {
+                        _activePipe = null;
+                        _activeSessionNonce = null;
+                    }
+                }
                 ConnectionChanged?.Invoke(this, false);
             }
         }
@@ -61,6 +73,11 @@ public sealed class BridgePipeServer : IAsyncDisposable
             throw new InvalidDataException("The plugin sent an invalid handshake.");
         }
 
+        lock (_connectionGate)
+        {
+            _activePipe = pipe;
+            _activeSessionNonce = hello.SessionNonce;
+        }
         await PipeFrameCodec.WriteAsync(
             pipe,
             PipeEnvelope.Create("welcome", 0, hello.SessionNonce, new { protocol = Contracts.Protocol.Version }),
@@ -84,6 +101,36 @@ public sealed class BridgePipeServer : IAsyncDisposable
         }
     }
 
+    public async Task<bool> SendAsync<T>(string type, long sequence, T payload, CancellationToken cancellationToken = default)
+    {
+        NamedPipeServerStream? pipe;
+        string? nonce;
+        lock (_connectionGate)
+        {
+            pipe = _activePipe;
+            nonce = _activeSessionNonce;
+        }
+        if (pipe?.IsConnected != true || nonce is null) return false;
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!ReferenceEquals(pipe, _activePipe) || !pipe.IsConnected) return false;
+            await PipeFrameCodec.WriteAsync(
+                pipe,
+                PipeEnvelope.Create(type, sequence, nonce, payload),
+                cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _stop.CancelAsync().ConfigureAwait(false);
@@ -98,7 +145,7 @@ public sealed class BridgePipeServer : IAsyncDisposable
             }
         }
 
+        _writeGate.Dispose();
         _stop.Dispose();
     }
 }
-

@@ -24,8 +24,9 @@ SDR#
 
 ## Current status
 
-Architecture, protocol, a buildable Windows solution, the local named-pipe
-transport, and secure browser-assisted device pairing are implemented. No
+Architecture, protocol, a buildable Windows solution, the bidirectional local
+named-pipe transport, secure browser-assisted device pairing, rotating DPoP
+credentials, and exact-frequency station candidates are implemented. No
 production plugin binary is available yet.
 
 ## Pairing the Bridge
@@ -38,6 +39,12 @@ production plugin binary is available yet.
 5. The private key and device credentials are encrypted for the current
    Windows user with DPAPI. The SDR# plugin never receives a DXNexus password
    or cloud token.
+
+After pairing, tune SDR# to an FM, AM/MW, or SW broadcast channel. The Bridge
+waits briefly for tuning to settle, uses the default Listening Point and
+receiver saved in DXNexus, and returns the ranked exact-frequency candidates
+to the plugin. The panel shows distance, bearing, modeled field strength, and
+received/wishlist state. Credentials remain inside the Bridge.
 
 ## Development prerequisites
 
