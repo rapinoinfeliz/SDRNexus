@@ -12,6 +12,7 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
     private RadioStatePublisher? _publisher;
     private PipeRadioStateSink? _sink;
     private PluginPanel? _panel;
+    private SynchronizationContext? _uiContext;
     private bool _closed;
 
     public string DisplayName => "DXNexus";
@@ -37,11 +38,33 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         }
 
         _control = control;
+        _uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _host = new SdrSharpHostAdapter(control);
         _collector = new RadioStateCollector(_host);
         _sink = new PipeRadioStateSink(LocalPipeName.ForCurrentWindowsUser());
+        _sink.TuneRequested += HandleTuneRequested;
         _publisher = new RadioStatePublisher(_collector, _sink);
         _publisher.Start();
+    }
+
+    private void HandleTuneRequested(object? sender, DXNexus.Contracts.RemoteTuneCommand command)
+    {
+        var context = _uiContext;
+        if (context is null) return;
+        context.Post(_ =>
+        {
+            var host = _host;
+            var sink = _sink;
+            if (host is null || sink is null) return;
+            var result = host.ApplyTune(command);
+            _ = SendTuneResultSafelyAsync(sink, result, command.ExpectedSequence);
+        }, null);
+    }
+
+    private static async Task SendTuneResultSafelyAsync(PipeRadioStateSink sink, DXNexus.Contracts.RemoteTuneResult result, long sequence)
+    {
+        try { await sink.SendTuneResultAsync(result, sequence).ConfigureAwait(false); }
+        catch (Exception error) when (error is IOException or InvalidOperationException or ObjectDisposedException) { }
     }
 
     public void LoadGui()
@@ -65,10 +88,12 @@ public sealed class DxnexusPlugin : ISharpPlugin, ICanLazyLoadGui, ISupportStatu
         _panel = null;
         _publisher?.Dispose();
         _publisher = null;
+        if (_sink is not null) _sink.TuneRequested -= HandleTuneRequested;
         _sink = null;
         _collector?.Dispose();
         _collector = null;
         _host = null;
         _control = null;
+        _uiContext = null;
     }
 }

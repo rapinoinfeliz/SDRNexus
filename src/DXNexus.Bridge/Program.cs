@@ -28,6 +28,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private readonly OfflineMutationQueue _offlineQueue;
     private readonly LiveCompanionClient _liveCompanion;
     private readonly ToolStripMenuItem _liveMenu;
+    private readonly ToolStripMenuItem _remoteTuneMenu;
     private readonly SemaphoreSlim _syncGate = new(1, 1);
     private readonly System.Threading.Timer _syncTimer;
     private readonly System.Threading.Timer _liveHeartbeatTimer;
@@ -36,6 +37,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private SequencedRadioSnapshot? _latestRadioSnapshot;
     private CandidateContextResponse? _latestCandidateContext;
     private volatile bool _liveEnabled;
+    private DateTimeOffset _remoteTuneUntil;
 
     public BridgeApplicationContext()
     {
@@ -52,6 +54,9 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _liveMenu = new ToolStripMenuItem("Live browser companion") { CheckOnClick = true };
         _liveMenu.CheckedChanged += (_, _) => _ = SetLiveCompanionAsync(_liveMenu.Checked);
         menu.Items.Add(_liveMenu);
+        _remoteTuneMenu = new ToolStripMenuItem("Allow browser tuning for 15 minutes…");
+        _remoteTuneMenu.Click += (_, _) => EnableRemoteTuning();
+        menu.Items.Add(_remoteTuneMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
@@ -69,7 +74,60 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _pipeServer.Start();
         _syncTimer = new System.Threading.Timer(_ => _ = SynchronizeOfflineMutationsAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
         _liveHeartbeatTimer = new System.Threading.Timer(_ => _ = PublishLiveStateAsync(), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+        _liveCompanion.TuneCommandReceived += HandleRemoteTuneCommand;
         _ = InitializePreferencesAsync();
+    }
+
+    private void EnableRemoteTuning()
+    {
+        var choice = MessageBox.Show(
+            "For the next 15 minutes, the signed-in DXNexus browser may change the SDR# tuned frequency. " +
+            "Commands are accepted only while the Bridge, plugin and current tuner state all match.\n\nAllow temporary browser tuning?",
+            "DXNexus browser tuning",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+        if (choice != DialogResult.Yes) return;
+        _remoteTuneUntil = DateTimeOffset.UtcNow.AddMinutes(15);
+        _remoteTuneMenu.Text = "Browser tuning allowed · 15 min";
+    }
+
+    private void HandleRemoteTuneCommand(object? sender, RemoteTuneCommand command) => _ = ApplyRemoteTuneCommandAsync(command);
+
+    private async Task ApplyRemoteTuneCommandAsync(RemoteTuneCommand command)
+    {
+        var snapshot = _latestRadioSnapshot;
+        RemoteTuneResult failure(string message) => new(
+            "live.command.result", Protocol.Version, command.CommandId, "tune", false, message);
+        try
+        {
+            if (command.DeviceId != await _apiClient.GetDeviceIdAsync().ConfigureAwait(false))
+            {
+                await PublishTuneResultSafelyAsync(failure("The tune command targets another Bridge."));
+                return;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            await PublishTuneResultSafelyAsync(failure("The Bridge is not paired with DXNexus."));
+            return;
+        }
+        var now = DateTimeOffset.UtcNow;
+        var rejection = RemoteTunePolicy.RejectionReason(command, snapshot, _remoteTuneUntil, now);
+        if (rejection is not null)
+        {
+            if (now >= _remoteTuneUntil) _remoteTuneUntil = default;
+            await PublishTuneResultSafelyAsync(failure(rejection));
+            return;
+        }
+        if (!await _pipeServer.SendAsync("command.tune", snapshot!.Sequence, command, CancellationToken.None))
+            await PublishTuneResultSafelyAsync(failure("The SDR# plugin is not connected."));
+    }
+
+    private async Task PublishTuneResultSafelyAsync(RemoteTuneResult result)
+    {
+        try { await _liveCompanion.PublishCommandResultAsync(result).ConfigureAwait(false); }
+        catch (Exception error) when (IsTransient(error) || error is InvalidOperationException) { }
     }
 
     private async Task InitializePreferencesAsync()
@@ -131,6 +189,12 @@ internal sealed class BridgeApplicationContext : ApplicationContext
 
     private void HandleMessageReceived(object? sender, PipeEnvelope message)
     {
+        if (message.Type == "command.tune.result")
+        {
+            var result = message.Payload.Deserialize<RemoteTuneResult>(JsonOptions);
+            if (result is not null) _ = PublishTuneResultSafelyAsync(result);
+            return;
+        }
         if (message.Type == "command.wishlist")
         {
             var command = message.Payload.Deserialize<WishlistCommand>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -378,6 +442,16 @@ internal sealed class BridgeApplicationContext : ApplicationContext
 
     private async Task PublishLiveStateAsync(CancellationToken cancellationToken = default)
     {
+        if (_remoteTuneUntil != default && DateTimeOffset.UtcNow >= _remoteTuneUntil)
+        {
+            _remoteTuneUntil = default;
+            _uiContext.Post(_ => _remoteTuneMenu.Text = "Allow browser tuning for 15 minutes…", null);
+        }
+        else if (_remoteTuneUntil > DateTimeOffset.UtcNow)
+        {
+            var minutes = Math.Max(1, (int)Math.Ceiling((_remoteTuneUntil - DateTimeOffset.UtcNow).TotalMinutes));
+            _uiContext.Post(_ => _remoteTuneMenu.Text = $"Browser tuning allowed · {minutes} min", null);
+        }
         var snapshot = _latestRadioSnapshot;
         if (!_liveEnabled || snapshot is null || !_credentialStore.Exists) return;
         try
@@ -417,6 +491,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _liveHeartbeatTimer.Dispose();
         _pipeServer.ConnectionChanged -= HandleConnectionChanged;
         _pipeServer.MessageReceived -= HandleMessageReceived;
+        _liveCompanion.TuneCommandReceived -= HandleRemoteTuneCommand;
         _pipeServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _liveCompanion.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _apiClient.Dispose();

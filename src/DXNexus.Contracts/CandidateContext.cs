@@ -167,3 +167,22 @@ public sealed record LiveBrowserState(
     DateTimeOffset GeneratedAt,
     SequencedRadioSnapshot Snapshot,
     CandidateContextResponse? Candidates);
+
+public sealed record RemoteTuneCommand(
+    string Type,
+    string Protocol,
+    Guid CommandId,
+    Guid DeviceId,
+    long FrequencyHz,
+    long ExpectedFrequencyHz,
+    long ExpectedSequence,
+    DateTimeOffset ExpiresAt);
+
+public sealed record RemoteTuneResult(
+    string Type,
+    string Protocol,
+    Guid CommandId,
+    string Action,
+    bool Success,
+    string Message,
+    long? FrequencyHz = null);

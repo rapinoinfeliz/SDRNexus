@@ -59,6 +59,29 @@ internal sealed class SdrSharpHostAdapter : IRadioHost
                 EmptyAsNull(_control.RdsRadioText)));
     }
 
+    public RemoteTuneResult ApplyTune(RemoteTuneCommand command)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (command.ExpiresAt <= DateTimeOffset.UtcNow)
+            return Result(command, false, "The browser tune command expired.");
+        if (_control.Frequency != command.ExpectedFrequencyHz)
+            return Result(command, false, "The SDR# frequency changed before the command was applied.");
+        if (command.FrequencyHz is < 1_000 or > 2_000_000_000)
+            return Result(command, false, "Requested frequency is outside the plugin safety bounds.");
+        try
+        {
+            _control.Frequency = command.FrequencyHz;
+            return Result(command, true, $"SDR# tuned to {command.FrequencyHz} Hz.", _control.Frequency);
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            return Result(command, false, $"SDR# rejected the requested frequency: {error.Message}");
+        }
+    }
+
+    private static RemoteTuneResult Result(RemoteTuneCommand command, bool success, string message, long? frequencyHz = null) =>
+        new("live.command.result", Protocol.Version, command.CommandId, "tune", success, message, frequencyHz);
+
     private void HandlePropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (_disposed || (args.PropertyName is not null && !RelevantProperties.Contains(args.PropertyName)))

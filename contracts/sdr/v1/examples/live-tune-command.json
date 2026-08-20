@@ -1,0 +1,10 @@
+{
+  "type": "live.command.tune",
+  "protocol": "1.0",
+  "commandId": "0198c9be-1d91-7e6c-9cab-7546075f0847",
+  "deviceId": "0198c9be-1d91-7e6c-9cab-7546075f0848",
+  "frequencyHz": 98900000,
+  "expectedFrequencyHz": 92300000,
+  "expectedSequence": 42,
+  "expiresAt": "2026-08-20T23:04:15Z"
+}

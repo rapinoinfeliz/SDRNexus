@@ -10,9 +10,19 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
     private readonly AuthenticatedDeviceApiClient _apiClient = apiClient;
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private ClientWebSocket? _socket;
+    private CancellationTokenSource? _receiveStop;
+    private Task? _receiveTask;
     private DateTimeOffset _reconnectBefore;
 
+    public event EventHandler<RemoteTuneCommand>? TuneCommandReceived;
+
     public async Task<bool> PublishAsync(LiveBrowserState state, CancellationToken cancellationToken = default)
+        => await SendPayloadAsync(state, cancellationToken).ConfigureAwait(false);
+
+    public async Task<bool> PublishCommandResultAsync(RemoteTuneResult result, CancellationToken cancellationToken = default)
+        => await SendPayloadAsync(result, cancellationToken).ConfigureAwait(false);
+
+    private async Task<bool> SendPayloadAsync<T>(T state, CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(state, JsonOptions);
         if (payload.Length > Protocol.MaximumCloudMessageBytes)
@@ -69,6 +79,8 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
             await socket.ConnectAsync(authentication.Endpoint, cancellationToken).ConfigureAwait(false);
             _socket = socket;
             _reconnectBefore = DateTimeOffset.UtcNow.AddMinutes(4);
+            _receiveStop = new CancellationTokenSource();
+            _receiveTask = ReceiveAsync(socket, _receiveStop.Token);
         }
         catch
         {
@@ -77,16 +89,47 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
         }
     }
 
+    private async Task ReceiveAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[4_096];
+        try
+        {
+            while (socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+            {
+                using var payload = new MemoryStream();
+                WebSocketReceiveResult result;
+                do
+                {
+                    result = await socket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
+                    if (result.MessageType == WebSocketMessageType.Close) return;
+                    if (result.MessageType != WebSocketMessageType.Text) throw new InvalidDataException("Live relay sent a non-text command.");
+                    await payload.WriteAsync(buffer.AsMemory(0, result.Count), cancellationToken).ConfigureAwait(false);
+                    if (payload.Length > Protocol.MaximumCloudMessageBytes) throw new InvalidDataException("Live relay command is too large.");
+                } while (!result.EndOfMessage);
+                var command = JsonSerializer.Deserialize<RemoteTuneCommand>(payload.ToArray(), JsonOptions);
+                if (command?.Type == "live.command.tune" && command.Protocol == Protocol.Version)
+                    TuneCommandReceived?.Invoke(this, command);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception error) when (error is WebSocketException or IOException or InvalidDataException or JsonException) { }
+    }
+
     private void DisposeSocket()
     {
+        _receiveStop?.Cancel();
         _socket?.Dispose();
         _socket = null;
+        _receiveStop?.Dispose();
+        _receiveStop = null;
+        _receiveTask = null;
         _reconnectBefore = default;
     }
 
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync().ConfigureAwait(false);
+        TuneCommandReceived = null;
         _sendGate.Dispose();
     }
 }

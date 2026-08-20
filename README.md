@@ -61,6 +61,13 @@ frequency and up to six exact-channel candidates through a private outgoing
 WebSocket. The relay is ephemeral: it does not store VFO state in D1/R2 and does
 not transmit audio, IQ, FFT, waterfall, hardware serials, or listening history.
 
+Browser tuning remains independently locked. It is available only after the
+user selects **Allow browser tuning for 15 minutes…** in the local Bridge tray
+and confirms the warning. Every tune command expires after 15 seconds, must
+match the current tuner sequence/frequency, is revalidated inside the SDR#
+plugin, and is acknowledged back to the browser. The permission is never
+persisted and returns to locked when the Bridge restarts or the timer expires.
+
 ## Development prerequisites
 
 - .NET 9 SDK;
