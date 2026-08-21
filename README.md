@@ -66,6 +66,8 @@ Windows user. When enabled, Account → Connected devices shows the current SDR#
 frequency and up to six exact-channel candidates through a private outgoing
 WebSocket. The relay is ephemeral: it does not store VFO state in D1/R2 and does
 not transmit audio, IQ, FFT, waterfall, hardware serials, or listening history.
+The Bridge executable, notification-area icon and startup shortcut use the
+official DXNexus application icon published by the web application.
 
 Browser tuning remains independently locked. It is available only after the
 user selects **Allow browser tuning for 15 minutes…** in the local Bridge tray,

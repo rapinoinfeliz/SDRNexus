@@ -18,6 +18,7 @@ internal static class Program
 internal sealed class BridgeApplicationContext : ApplicationContext
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly Icon? _applicationIcon;
     private readonly NotifyIcon _notifyIcon;
     private readonly BridgePipeServer _pipeServer;
     private readonly SynchronizationContext _uiContext;
@@ -66,10 +67,11 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
+        _applicationIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         _notifyIcon = new NotifyIcon
         {
             Text = BridgeIdentity.ProductName,
-            Icon = SystemIcons.Application,
+            Icon = _applicationIcon ?? SystemIcons.Application,
             ContextMenuStrip = menu,
             Visible = true,
         };
@@ -614,6 +616,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _syncGate.Dispose();
         _httpClient.Dispose();
         _notifyIcon.Dispose();
+        _applicationIcon?.Dispose();
         base.ExitThreadCore();
     }
 }

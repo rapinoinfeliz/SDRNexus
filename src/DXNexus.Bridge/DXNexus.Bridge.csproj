@@ -3,6 +3,7 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\dxnexus-icon.ico</ApplicationIcon>
     <Description>Per-user Windows companion for SDRNexus.</Description>
   </PropertyGroup>
   <ItemGroup>

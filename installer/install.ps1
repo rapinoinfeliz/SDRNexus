@@ -42,6 +42,7 @@ if (-not $NoStartup) {
     $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $startup 'DXNexus Bridge.lnk'))
     $shortcut.TargetPath = Join-Path $bridgeDirectory 'DXNexus.Bridge.exe'
     $shortcut.WorkingDirectory = $bridgeDirectory
+    $shortcut.IconLocation = "$(Join-Path $bridgeDirectory 'DXNexus.Bridge.exe'),0"
     $shortcut.Description = 'DXNexus companion for SDR#'
     $shortcut.Save()
 }
