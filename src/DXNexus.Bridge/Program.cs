@@ -97,6 +97,10 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         if (choice != DialogResult.Yes) return;
         _remoteTuneUntil = DateTimeOffset.UtcNow.AddMinutes(15);
         _remoteTuneMenu.Text = "Browser tuning allowed · 15 min";
+        if (!_liveMenu.Checked)
+            _liveMenu.Checked = true;
+        else if (!_liveEnabled)
+            _ = SetLiveCompanionAsync(true);
         _ = PublishBridgeStatusAsync();
     }
 

@@ -69,7 +69,8 @@ current frequency and a current-or-earlier tuner sequence, is revalidated
 inside the SDR# plugin, and is acknowledged back to the browser. Signal-only
 snapshot updates therefore do not invalidate a fresh command. The permission
 is never persisted and returns to locked when the Bridge restarts or the timer
-expires.
+expires. Granting it enables and remembers the live browser companion so the
+command path cannot be authorized while its WebSocket is disabled.
 
 The panel reports the local pipe, cloud API, live WebSocket and browser-tuning
 permission separately. Candidate lookups are keyed only by catalog-relevant
