@@ -16,8 +16,9 @@ internal sealed class QuickLogForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(370, 390);
-        Padding = new Padding(20);
+        ShowInTaskbar = false;
+        AutoScaleMode = AutoScaleMode.Dpi;
+        ClientSize = new Size(390, 480);
         _quality.Items.AddRange(["Barely audible", "Poor", "Fair", "Good", "Excellent"]);
         _quality.SelectedItem = "Good";
         _identification.Items.AddRange(["Confirmed", "Probable", "Tentative", "Unidentified"]);
@@ -32,14 +33,31 @@ internal sealed class QuickLogForm : Form
             ForeColor = SystemColors.GrayText,
             Text = $"{FormatFrequency(candidate.FrequencyHz)} · {candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}",
         };
-        var save = new Button { Text = "Save reception", AutoSize = true };
-        save.Click += (_, _) => { DialogResult = DialogResult.OK; Close(); };
-        var cancel = new Button { Text = "Cancel", AutoSize = true };
-        cancel.Click += (_, _) => Close();
-        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+        var save = new Button { Text = "Save reception", AutoSize = true, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        AcceptButton = save;
+        CancelButton = cancel;
+
+        var buttons = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(20, 8, 20, 20),
+            WrapContents = false,
+        };
         buttons.Controls.Add(save);
         buttons.Controls.Add(cancel);
-        var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+
+        var layout = new FlowLayoutPanel
+        {
+            AutoScroll = true,
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            Padding = new Padding(20, 20, 20, 0),
+            WrapContents = false,
+        };
         layout.Controls.Add(title);
         layout.Controls.Add(context);
         layout.Controls.Add(FieldLabel("Signal quality"));
@@ -50,8 +68,19 @@ internal sealed class QuickLogForm : Form
         layout.Controls.Add(_methods);
         layout.Controls.Add(FieldLabel("Notes (optional)"));
         layout.Controls.Add(_notes);
-        layout.Controls.Add(buttons);
-        Controls.Add(layout);
+
+        var root = new TableLayoutPanel
+        {
+            ColumnCount = 1,
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.Controls.Add(layout, 0, 0);
+        root.Controls.Add(buttons, 0, 1);
+        Controls.Add(root);
     }
 
     public string SignalQuality => Slug(_quality.SelectedItem?.ToString() ?? "good");
