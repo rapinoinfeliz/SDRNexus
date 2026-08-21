@@ -18,7 +18,6 @@ internal sealed class PluginPanel : UserControl
     private readonly Label _liveStatusLabel;
     private readonly ModernButton _remoteTuneButton;
     private readonly ModernButton _reconnectButton;
-    private readonly FrequencyDisplay _frequencyDisplay;
     private readonly Label _candidateStatusLabel;
     private readonly FlowLayoutPanel _candidateList;
     private readonly FlowLayoutPanel _content;
@@ -46,15 +45,15 @@ internal sealed class PluginPanel : UserControl
         Font = DxnexusTheme.UiFont(9.5f);
         ForeColor = DxnexusTheme.Text;
         MinimumSize = new Size(250, 260);
-        Padding = new Padding(15, 16, 15, 12);
+        Padding = new Padding(9, 9, 9, 8);
 
         var title = new Label
         {
             AutoSize = true,
             BackColor = DxnexusTheme.Background,
-            Font = DxnexusTheme.UiFont(18, FontStyle.Bold),
+            Font = DxnexusTheme.UiFont(15, FontStyle.Bold),
             ForeColor = DxnexusTheme.Text,
-            Margin = new Padding(0, 0, 0, 12),
+            Margin = new Padding(0, 0, 0, 6),
             Text = "DXNexus",
         };
 
@@ -78,13 +77,13 @@ internal sealed class PluginPanel : UserControl
         {
             BackColor = DxnexusTheme.Border,
             Height = 1,
-            Margin = new Padding(0, 14, 0, 13),
+            Margin = new Padding(0, 6, 0, 6),
         };
 
         _reconnectButton = new ModernButton
         {
             ForeColor = DxnexusTheme.Warning,
-            Margin = new Padding(0, 0, 0, 8),
+            Margin = new Padding(0, 0, 0, 5),
             Text = "↻  Reconnect DXNexus",
             Visible = false,
         };
@@ -110,7 +109,8 @@ internal sealed class PluginPanel : UserControl
         _remoteTuneButton = new ModernButton
         {
             ForeColor = DxnexusTheme.Text,
-            Margin = new Padding(0, 0, 0, 14),
+            Height = 32,
+            Margin = new Padding(0, 0, 0, 6),
             NormalColor = Color.FromArgb(28, 47, 59),
             Text = "◉  Enable browser tuning (15 min)",
         };
@@ -134,18 +134,15 @@ internal sealed class PluginPanel : UserControl
             }
         };
 
-        _frequencyDisplay = new FrequencyDisplay { Dock = DockStyle.Fill, Margin = new Padding(0) };
-        var frequencyCard = BuildFrequencyCard();
-
         var spectrumOverlayToggle = new CheckBox
         {
             AutoSize = false,
             BackColor = DxnexusTheme.Background,
             Checked = _spectrumOverlay.Enabled,
-            Font = DxnexusTheme.UiFont(10),
+            Font = DxnexusTheme.UiFont(9),
             ForeColor = DxnexusTheme.Text,
-            Height = 28,
-            Margin = new Padding(0, 14, 0, 8),
+            Height = 23,
+            Margin = new Padding(0, 1, 0, 3),
             Text = "Station labels on spectrum",
             UseVisualStyleBackColor = false,
         };
@@ -155,10 +152,10 @@ internal sealed class PluginPanel : UserControl
         {
             AutoEllipsis = true,
             BackColor = DxnexusTheme.Background,
-            Font = DxnexusTheme.UiFont(10),
+            Font = DxnexusTheme.UiFont(9),
             ForeColor = DxnexusTheme.Muted,
-            Height = 30,
-            Margin = new Padding(0, 0, 0, 8),
+            Height = 24,
+            Margin = new Padding(0, 0, 0, 5),
             Text = "◉  Tune to a broadcast frequency to see candidates.",
             TextAlign = ContentAlignment.MiddleLeft,
         };
@@ -189,7 +186,6 @@ internal sealed class PluginPanel : UserControl
         _content.Controls.Add(separator);
         _content.Controls.Add(_reconnectButton);
         _content.Controls.Add(_remoteTuneButton);
-        _content.Controls.Add(frequencyCard);
         _content.Controls.Add(spectrumOverlayToggle);
         _content.Controls.Add(_candidateStatusLabel);
         _content.Controls.Add(_candidateList);
@@ -197,7 +193,7 @@ internal sealed class PluginPanel : UserControl
         Controls.Add(_content);
 
         _stretchControls.AddRange([
-            statuses, separator, _reconnectButton, _remoteTuneButton, frequencyCard,
+            statuses, separator, _reconnectButton, _remoteTuneButton,
             spectrumOverlayToggle, _candidateStatusLabel, _candidateList, footer,
         ]);
 
@@ -217,31 +213,6 @@ internal sealed class PluginPanel : UserControl
     {
         base.OnResize(eventArgs);
         UpdateResponsiveWidths();
-    }
-
-    private RoundedPanel BuildFrequencyCard()
-    {
-        var card = new RoundedPanel
-        {
-            BorderColor = Color.FromArgb(52, 128, 168),
-            Height = 88,
-            Margin = new Padding(0),
-            Padding = new Padding(13, 10, 13, 10),
-        };
-        var layout = new TableLayoutPanel
-        {
-            BackColor = DxnexusTheme.Card,
-            ColumnCount = 2,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(0),
-            RowCount = 1,
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 49));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.Controls.Add(new WaveformGlyph { Anchor = AnchorStyles.Left }, 0, 0);
-        layout.Controls.Add(_frequencyDisplay, 1, 0);
-        card.Controls.Add(layout);
-        return card;
     }
 
     private static Control BuildFooter()
@@ -274,8 +245,8 @@ internal sealed class PluginPanel : UserControl
         {
             BackColor = DxnexusTheme.Background,
             ColumnCount = 2,
-            Height = 38,
-            Margin = new Padding(0, 10, 0, 0),
+            Height = 30,
+            Margin = new Padding(0, 6, 0, 0),
             RowCount = 1,
         };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
@@ -289,7 +260,7 @@ internal sealed class PluginPanel : UserControl
     {
         AutoSize = true,
         BackColor = DxnexusTheme.Background,
-        Font = DxnexusTheme.UiFont(10),
+        Font = DxnexusTheme.UiFont(9),
         ForeColor = DxnexusTheme.Muted,
         Margin = new Padding(0),
         Text = text,
@@ -303,7 +274,7 @@ internal sealed class PluginPanel : UserControl
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             BackColor = DxnexusTheme.Background,
             FlowDirection = FlowDirection.LeftToRight,
-            Margin = new Padding(0, 0, 0, 4),
+            Margin = new Padding(0, 0, 0, 1),
             WrapContents = false,
         };
         row.Controls.Add(dot);
@@ -435,9 +406,9 @@ internal sealed class PluginPanel : UserControl
             BorderColor = candidate.Received.AtListeningPoint
                 ? Color.FromArgb(55, 126, 91)
                 : candidate.Wishlisted ? Color.FromArgb(117, 69, 87) : DxnexusTheme.Border,
-            Height = 148,
-            Margin = new Padding(0, 0, 0, 11),
-            Padding = new Padding(12),
+            Height = 126,
+            Margin = new Padding(0, 0, 0, 7),
+            Padding = new Padding(9),
         };
         var root = new TableLayoutPanel
         {
@@ -448,7 +419,7 @@ internal sealed class PluginPanel : UserControl
             RowCount = 2,
         };
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
 
         var heading = new TableLayoutPanel
         {
@@ -458,16 +429,16 @@ internal sealed class PluginPanel : UserControl
             Margin = new Padding(0),
             RowCount = 1,
         };
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
         heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 62));
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56));
 
         var logoHost = new Panel { BackColor = DxnexusTheme.Card, Dock = DockStyle.Fill, Margin = new Padding(0) };
         var placeholder = new Label
         {
             BackColor = DxnexusTheme.Card,
             Dock = DockStyle.Fill,
-            Font = DxnexusTheme.UiFont(19, FontStyle.Bold),
+            Font = DxnexusTheme.UiFont(16, FontStyle.Bold),
             ForeColor = candidate.Received.AtListeningPoint ? DxnexusTheme.Success : DxnexusTheme.Teal,
             Text = "◉",
             TextAlign = ContentAlignment.MiddleCenter,
@@ -489,7 +460,7 @@ internal sealed class PluginPanel : UserControl
             BackColor = DxnexusTheme.Card,
             ColumnCount = 1,
             Dock = DockStyle.Fill,
-            Margin = new Padding(9, 0, 7, 0),
+            Margin = new Padding(7, 0, 5, 0),
             RowCount = 2,
         };
         text.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
@@ -499,7 +470,7 @@ internal sealed class PluginPanel : UserControl
             AutoEllipsis = true,
             BackColor = DxnexusTheme.Card,
             Dock = DockStyle.Fill,
-            Font = DxnexusTheme.UiFont(10.2f, FontStyle.Bold),
+            Font = DxnexusTheme.UiFont(9.5f, FontStyle.Bold),
             ForeColor = DxnexusTheme.Text,
             Margin = new Padding(0),
             Text = candidate.StationName,
@@ -511,7 +482,7 @@ internal sealed class PluginPanel : UserControl
             AutoEllipsis = true,
             BackColor = DxnexusTheme.Card,
             Dock = DockStyle.Fill,
-            Font = DxnexusTheme.UiFont(9),
+            Font = DxnexusTheme.UiFont(8.4f),
             ForeColor = DxnexusTheme.Muted,
             Margin = new Padding(0),
             Text = $"{candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}{received}",
@@ -524,7 +495,7 @@ internal sealed class PluginPanel : UserControl
         {
             BackColor = DxnexusTheme.Card,
             Dock = DockStyle.Fill,
-            Font = DxnexusTheme.UiFont(9),
+            Font = DxnexusTheme.UiFont(8.4f),
             ForeColor = DxnexusTheme.Accent,
             Margin = new Padding(0),
             Text = candidate.Estimate.FieldStrengthDbuvM is double value ? $"{value:0}\ndBµV/m" : "",
@@ -606,7 +577,7 @@ internal sealed class PluginPanel : UserControl
             BackColor = DxnexusTheme.Card,
             ColumnCount = 3,
             Dock = DockStyle.Fill,
-            Margin = new Padding(0, 4, 0, 0),
+            Margin = new Padding(0, 3, 0, 0),
             RowCount = 1,
         };
         actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
@@ -628,7 +599,7 @@ internal sealed class PluginPanel : UserControl
     private static ModernButton ActionButton(string text) => new()
     {
         Dock = DockStyle.Fill,
-        Font = DxnexusTheme.UiFont(9),
+        Font = DxnexusTheme.UiFont(8.5f),
         ForeColor = DxnexusTheme.Accent,
         Text = text,
     };
@@ -722,9 +693,6 @@ internal sealed class PluginPanel : UserControl
             ClearCandidates();
         }
         _latestSnapshot = snapshot;
-        _frequencyDisplay.SetValues(
-            FormatFrequency(snapshot.Radio.FrequencyHz),
-            $"{snapshot.Radio.Detector.ToString().ToUpperInvariant()}   ·   {snapshot.Radio.FilterBandwidthHz / 1_000d:0.#} kHz");
     }
 
     private void UpdateResponsiveWidths()
@@ -741,10 +709,6 @@ internal sealed class PluginPanel : UserControl
     }
 
     private static string CandidateKey(string broadcastId, string siteId) => $"{broadcastId}\n{siteId}";
-
-    private static string FormatFrequency(long frequencyHz) => frequencyHz >= 1_000_000
-        ? $"{frequencyHz / 1_000_000d:0.000} MHz"
-        : $"{frequencyHz / 1_000d:0.0} kHz";
 
     protected override void Dispose(bool disposing)
     {
