@@ -8,6 +8,12 @@ The project is currently being implemented incrementally. The accepted
 architecture is documented in
 [`docs/adr/0001-plugin-bridge-architecture.md`](docs/adr/0001-plugin-bridge-architecture.md).
 
+The currently known production work that belongs in the main DXNexus
+web/Worker repository is tracked in
+[`docs/integration/dxnexus-production-handoff.md`](docs/integration/dxnexus-production-handoff.md).
+It contains reproduced failures, protocol requirements and end-to-end
+acceptance tests for the station catalog and browser tuning relay.
+
 ## Planned components
 
 ```text
