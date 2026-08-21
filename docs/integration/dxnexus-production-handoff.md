@@ -1,7 +1,54 @@
 # DXNexus production integration handoff
 
-Status date: 2026-08-20
+Status date: 2026-08-20 (DXNexus server fix deployed; Windows acceptance pending)
 Validated SDRNexus client revision: `4cdee24515b728287009e0d7d782d24a0c6054bf`
+
+## Resolution update
+
+DXNexus commit `55dc845310b039a2e1fb8db24acbbbb05e1582c8` was deployed successfully by
+GitHub Actions run `32434932427` on 2026-08-20. No SDRNexus contract or Windows
+client change was required for this server-side repair.
+
+The deployment:
+
+- explicitly binds the published static catalog to the Worker as `ASSETS`;
+- falls back to a same-origin catalog request if an older generated deployment
+  omits that binding;
+- proves known-frequency and empty-frequency behavior with automated tests;
+- uses one shared browser live client across the DXNexus UI;
+- adds **Tune SDR#** to Station Details and the station action dial;
+- sends one short-lived command based on a fresh tuner state;
+- displays pending, confirmation, rejection, timeout and disconnect states;
+- requires both `live.command.result` success and a subsequent tuner state at
+  the requested frequency before displaying **Tuned**; and
+- routes command results only to the browser connection that initiated them.
+
+DXNexus validation passed: lint, TypeScript, production build, 237 web tests,
+the radio-catalog publication audit and the post-deployment verification. The
+published catalog manifest is readable and reports 66,114 FM sites, 11,451 AM
+sites and 464 SW sites. The authenticated candidate call and physical tuner
+change must now be repeated on Windows because the DPoP device private key and
+local SDR# process correctly remain on that machine.
+
+### Short Windows retest
+
+1. Pulling or reinstalling SDRNexus is not required; keep the currently tested
+   Bridge/plugin build.
+2. Start SDR#, then start SDRNexus Bridge and wait for **Plugin connected** and
+   **DXNexus cloud connected**.
+3. Tune manually to 101.7 MHz WFM. The candidate request should return HTTP 200
+   and no longer show `catalog-unavailable`.
+4. Enable **Live browser companion** and unlock browser tuning for 15 minutes.
+5. Open the production DXNexus site, select a different FM station and press
+   **SDR#** in Station Details (or **Tune SDR#** in the right-click dial).
+6. Confirm the UI progresses through **Tuning…** to **Tuned** and SDR# changes
+   to the exact station frequency.
+7. Lock browser tuning locally and repeat once; the browser must show the
+   Bridge rejection instead of silently claiming success.
+
+If step 3 still fails, save the new sanitized request ID and response body. If
+step 6 fails, save the command ID plus the Bridge/plugin status text; do not
+share tokens, DPoP keys or account cookies.
 
 This document is the handoff to the DXNexus web/Worker repository. The Windows
 plugin and Bridge are installed and working locally, but the production DXNexus
