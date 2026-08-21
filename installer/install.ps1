@@ -1,14 +1,20 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateScript({ Test-Path (Join-Path $_ 'SDRSharp.exe') })]
+    [ValidateScript({
+        (Test-Path (Join-Path $_ 'SDRSharp.exe')) -or
+        (Test-Path (Join-Path $_ 'SDRSharp.dotnet9.exe')) -or
+        (Test-Path (Join-Path $_ 'SDRSharp.dotnet8.exe'))
+    })]
     [string]$SdrSharpPath,
     [switch]$NoStartup
 )
 
 $ErrorActionPreference = 'Stop'
 $SdrSharpPath = (Resolve-Path $SdrSharpPath).Path
-if (Get-Process SDRSharp -ErrorAction SilentlyContinue) { throw 'Close SDR# before installing SDRNexus.' }
+if (Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'SDRSharp*' }) {
+    throw 'Close SDR# before installing SDRNexus.'
+}
 
 $configPath = Join-Path $SdrSharpPath 'SDRSharp.config'
 $pluginDirectory = $SdrSharpPath
@@ -39,7 +45,7 @@ if (-not $NoStartup) {
     $shortcut.Description = 'DXNexus companion for SDR#'
     $shortcut.Save()
 }
-Start-Process (Join-Path $bridgeDirectory 'DXNexus.Bridge.exe')
+Start-Process (Join-Path $bridgeDirectory 'DXNexus.Bridge.exe') -WindowStyle Hidden
 Write-Host 'SDRNexus installed. Restart SDR# and open Radio tools -> DXNexus.'
 Write-Host "Plugin directory: $pluginDirectory"
 Write-Host "Bridge directory: $bridgeDirectory"

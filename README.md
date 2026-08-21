@@ -108,9 +108,11 @@ artifact. Extract it, open PowerShell in the extracted directory, and run:
 The installer reads `core.pluginsDirectory` from `SDRSharp.config`, copies only
 the four SDRNexus plugin assemblies there, installs the per-user Bridge under
 `LocalAppData\Programs`, and optionally starts it with Windows. SDR# must be
-closed. The package contains SHA-256 checksums and never redistributes SDR# or
-Airspy binaries. This remains a test package until the compatibility gates are
-completed on Windows with real SDR# hardware.
+closed. Classic `SDRSharp.exe` and the current `SDRSharp.dotnet8.exe` and
+`SDRSharp.dotnet9.exe` launchers are recognized. The package contains SHA-256
+checksums and never redistributes SDR# or Airspy binaries. This remains a test
+package until the compatibility gates are completed on Windows with real SDR#
+hardware.
 
 ## Important boundaries
 

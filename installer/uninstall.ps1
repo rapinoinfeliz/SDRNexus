@@ -2,7 +2,9 @@
 param()
 
 $ErrorActionPreference = 'Stop'
-if (Get-Process SDRSharp -ErrorAction SilentlyContinue) { throw 'Close SDR# before uninstalling SDRNexus.' }
+if (Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'SDRSharp*' }) {
+    throw 'Close SDR# before uninstalling SDRNexus.'
+}
 Get-Process DXNexus.Bridge -ErrorAction SilentlyContinue | Stop-Process -Force
 $bridgeDirectory = $PSScriptRoot
 $statePath = Join-Path $bridgeDirectory 'install-state.json'
