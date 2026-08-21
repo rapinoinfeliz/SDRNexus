@@ -70,6 +70,9 @@ WebSocket. The relay is ephemeral: it does not store VFO state in D1/R2 and does
 not transmit audio, IQ, FFT, waterfall, hardware serials, or listening history.
 The Bridge executable, notification-area icon and startup shortcut use the
 official DXNexus application icon published by the web application.
+When the station catalog includes a logo, the Bridge downloads it with strict
+size limits, converts formats such as WebP to a small PNG, and sends it over the
+local pipe for display beside the station name in the SDR# candidate list.
 
 Browser tuning remains independently locked. It is available only after the
 user selects **Allow browser tuning for 15 minutes…** in the local Bridge tray,

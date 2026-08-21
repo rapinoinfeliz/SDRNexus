@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dxnexus.example/contracts/sdr/v1/station-logo.schema.json",
+  "title": "Station logo prepared for the SDR# plugin",
+  "type": "object",
+  "required": ["sequence", "broadcastId", "siteId", "pngBytes"],
+  "properties": {
+    "sequence": { "type": "integer", "minimum": 0 },
+    "broadcastId": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "siteId": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "pngBytes": { "type": "string", "contentEncoding": "base64", "maxLength": 49152 }
+  },
+  "additionalProperties": false
+}

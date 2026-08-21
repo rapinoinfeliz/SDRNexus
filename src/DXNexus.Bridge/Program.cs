@@ -24,6 +24,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private readonly SynchronizationContext _uiContext;
     private readonly HttpClient _httpClient;
     private readonly AuthenticatedDeviceApiClient _apiClient;
+    private readonly StationLogoLoader _stationLogoLoader;
     private readonly DeviceCredentialStore _credentialStore;
     private readonly BridgePreferencesStore _preferencesStore;
     private readonly OfflineMutationQueue _offlineQueue;
@@ -54,6 +55,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _offlineQueue = new OfflineMutationQueue();
         _httpClient = new HttpClient { BaseAddress = PairingApiClient.ProductionBaseUri };
         _apiClient = new AuthenticatedDeviceApiClient(_httpClient, _credentialStore);
+        _stationLogoLoader = new StationLogoLoader(_httpClient);
         _liveCompanion = new LiveCompanionClient(_apiClient);
         var menu = new ContextMenuStrip();
         menu.Items.Add("Connect to DXNexus…", null, (_, _) => ShowPairing());
@@ -466,6 +468,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                 _latestCandidateContext = CompactLiveCandidates(response);
                 await _pipeServer.SendAsync("context.candidates", response.Sequence, response, query.Token)
                     .ConfigureAwait(false);
+                _ = PublishStationLogosAsync(response);
                 await PublishLiveStateAsync(query.Token).ConfigureAwait(false);
                 await PublishBridgeStatusAsync(query.Token).ConfigureAwait(false);
             }
@@ -525,6 +528,27 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         Candidates = response.Candidates.Take(6).ToArray(),
         NextCursor = null,
     };
+
+    private async Task PublishStationLogosAsync(CandidateContextResponse response)
+    {
+        foreach (var candidate in response.Candidates.Take(6).Where(candidate => !string.IsNullOrWhiteSpace(candidate.LogoUrl)))
+        {
+            try
+            {
+                var png = await _stationLogoLoader.LoadPngAsync(candidate.LogoUrl).ConfigureAwait(false);
+                if (png is null) continue;
+                await _pipeServer.SendAsync(
+                    "context.station-logo",
+                    response.Sequence,
+                    new StationLogoImage(response.Sequence, candidate.BroadcastId, candidate.SiteId, png),
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // A missing or unsupported logo must never affect station candidates.
+            }
+        }
+    }
 
     private async Task PublishLiveStateAsync(CancellationToken cancellationToken = default)
     {

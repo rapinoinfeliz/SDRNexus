@@ -20,6 +20,11 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
                 var candidates = message.Payload.Deserialize<CandidateContextResponse>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
                 if (candidates is not null) CandidatesReceived?.Invoke(this, candidates);
             }
+            else if (message.Type == "context.station-logo")
+            {
+                var logo = message.Payload.Deserialize<StationLogoImage>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (logo is not null) StationLogoReceived?.Invoke(this, logo);
+            }
             else if (message.Type == "context.error")
             {
                 var error = message.Payload.Deserialize<BridgeError>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -46,6 +51,7 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
     public bool IsConnected => _client.IsConnected;
     public event EventHandler<PipeEnvelope>? MessageReceived;
     public event EventHandler<CandidateContextResponse>? CandidatesReceived;
+    public event EventHandler<StationLogoImage>? StationLogoReceived;
     public event EventHandler<BridgeError>? ContextErrorReceived;
     public event EventHandler<BridgeServiceStatus>? BridgeStatusReceived;
     public event EventHandler<CommandResult>? CommandCompleted;

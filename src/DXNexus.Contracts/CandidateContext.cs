@@ -90,6 +90,12 @@ public sealed record CandidateContextResponse(
     string? NextCursor,
     StationCandidate[] Candidates);
 
+public sealed record StationLogoImage(
+    long Sequence,
+    string BroadcastId,
+    string SiteId,
+    byte[] PngBytes);
+
 public sealed record StationMutationContext(
     string BroadcastId,
     string SiteId,

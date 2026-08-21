@@ -18,7 +18,9 @@ internal sealed class PluginPanel : UserControl
     private readonly Label _modeLabel;
     private readonly Label _candidateStatusLabel;
     private readonly FlowLayoutPanel _candidateList;
+    private readonly Dictionary<string, PictureBox> _candidateLogos = new(StringComparer.Ordinal);
     private SequencedRadioSnapshot _latestSnapshot;
+    private long _candidateSequence = -1;
 
     public PluginPanel(RadioStateCollector collector, RadioStatePublisher publisher, PipeRadioStateSink sink, SpectrumOverlayController spectrumOverlay)
     {
@@ -151,6 +153,7 @@ internal sealed class PluginPanel : UserControl
         _collector.SnapshotChanged += HandleSnapshotChanged;
         _publisher.ConnectionStateChanged += HandleConnectionStateChanged;
         _sink.CandidatesReceived += HandleCandidatesReceived;
+        _sink.StationLogoReceived += HandleStationLogoReceived;
         _sink.ContextErrorReceived += HandleContextErrorReceived;
         _sink.BridgeStatusReceived += HandleBridgeStatusReceived;
         _sink.CommandCompleted += HandleCommandCompleted;
@@ -180,7 +183,7 @@ internal sealed class PluginPanel : UserControl
             BeginInvoke(() => HandleContextErrorReceived(sender, error));
             return;
         }
-        _candidateList.Controls.Clear();
+        ClearCandidates();
         _candidateStatusLabel.Text = error.Code == "catalog-unavailable"
             ? "The DXNexus station catalog is temporarily unavailable. Retrying automatically…"
             : error.Message;
@@ -247,7 +250,8 @@ internal sealed class PluginPanel : UserControl
     private void RenderCandidates(CandidateContextResponse response)
     {
         _candidateList.SuspendLayout();
-        _candidateList.Controls.Clear();
+        ClearCandidates();
+        _candidateSequence = response.Sequence;
         _candidateStatusLabel.Text = response.Candidates.Length == 0
             ? "No catalog candidate on this exact frequency."
             : $"{response.Candidates.Length} candidate{(response.Candidates.Length == 1 ? "" : "s")} · {response.Band}";
@@ -256,16 +260,38 @@ internal sealed class PluginPanel : UserControl
         {
             var received = candidate.Received.AtListeningPoint ? " · heard here" : candidate.Wishlisted ? " · target" : "";
             var field = candidate.Estimate.FieldStrengthDbuvM is double value ? $" · {value:0} dBµV/m" : "";
+            var hasLogo = !string.IsNullOrWhiteSpace(candidate.LogoUrl);
             var info = new Label
             {
                 AutoSize = true,
-                MaximumSize = new Size(300, 0),
+                MaximumSize = new Size(hasLogo ? 250 : 300, 0),
                 Margin = new Padding(0),
                 Text = $"{candidate.StationName}\n{candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}{field}{received}",
                 ForeColor = candidate.Received.AtListeningPoint
                     ? Color.FromArgb(84, 226, 159)
                     : Color.WhiteSmoke,
             };
+            var heading = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                Margin = new Padding(0),
+                WrapContents = false,
+            };
+            if (hasLogo)
+            {
+                var logo = new PictureBox
+                {
+                    Margin = new Padding(0, 0, 8, 0),
+                    Size = new Size(40, 40),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Visible = false,
+                };
+                _candidateLogos[CandidateKey(candidate.BroadcastId, candidate.SiteId)] = logo;
+                heading.Controls.Add(logo);
+            }
+            heading.Controls.Add(info);
             var target = new Button
             {
                 AutoSize = true,
@@ -345,12 +371,54 @@ internal sealed class PluginPanel : UserControl
                 WrapContents = false,
                 Margin = new Padding(0, 0, 0, 9),
             };
-            row.Controls.Add(info);
+            row.Controls.Add(heading);
             row.Controls.Add(actions);
             _candidateList.Controls.Add(row);
         }
         _candidateList.ResumeLayout();
     }
+
+    private void HandleStationLogoReceived(object? sender, StationLogoImage logo)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => HandleStationLogoReceived(sender, logo));
+            return;
+        }
+        if (logo.Sequence != _candidateSequence
+            || !_candidateLogos.TryGetValue(CandidateKey(logo.BroadcastId, logo.SiteId), out var picture)) return;
+
+        try
+        {
+            using var stream = new MemoryStream(logo.PngBytes, writable: false);
+            using var source = Image.FromStream(stream);
+            var rendered = new Bitmap(source);
+            var previous = picture.Image;
+            picture.Image = rendered;
+            picture.Visible = true;
+            previous?.Dispose();
+        }
+        catch (ArgumentException)
+        {
+            // The station row remains usable when a malformed image is received.
+        }
+    }
+
+    private void ClearCandidates()
+    {
+        foreach (var picture in _candidateLogos.Values)
+        {
+            picture.Image?.Dispose();
+            picture.Image = null;
+        }
+        _candidateLogos.Clear();
+        foreach (Control row in _candidateList.Controls.Cast<Control>().ToArray()) row.Dispose();
+        _candidateList.Controls.Clear();
+        _candidateSequence = -1;
+    }
+
+    private static string CandidateKey(string broadcastId, string siteId) => $"{broadcastId}\n{siteId}";
 
     private void HandleConnectionStateChanged(object? sender, BridgeConnectionState state)
     {
@@ -403,7 +471,7 @@ internal sealed class PluginPanel : UserControl
         {
             _candidateStatusLabel.Text = "Loading station candidates…";
             _candidateStatusLabel.ForeColor = Color.FromArgb(170, 185, 195);
-            _candidateList.Controls.Clear();
+            ClearCandidates();
         }
         _latestSnapshot = snapshot;
         _frequencyLabel.Text = FormatFrequency(snapshot.Radio.FrequencyHz);
@@ -424,9 +492,11 @@ internal sealed class PluginPanel : UserControl
             _collector.SnapshotChanged -= HandleSnapshotChanged;
             _publisher.ConnectionStateChanged -= HandleConnectionStateChanged;
             _sink.CandidatesReceived -= HandleCandidatesReceived;
+            _sink.StationLogoReceived -= HandleStationLogoReceived;
             _sink.ContextErrorReceived -= HandleContextErrorReceived;
             _sink.BridgeStatusReceived -= HandleBridgeStatusReceived;
             _sink.CommandCompleted -= HandleCommandCompleted;
+            ClearCandidates();
         }
 
         base.Dispose(disposing);
