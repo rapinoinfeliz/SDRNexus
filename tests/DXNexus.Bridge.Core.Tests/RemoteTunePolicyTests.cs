@@ -16,7 +16,9 @@ public sealed class RemoteTunePolicyTests
         Assert.Null(RemoteTunePolicy.RejectionReason(command, snapshot, Now.AddMinutes(15), Now));
         Assert.Contains("locked", RemoteTunePolicy.RejectionReason(command, snapshot, default, Now));
         Assert.Contains("expired", RemoteTunePolicy.RejectionReason(command with { ExpiresAt = Now }, snapshot, Now.AddMinutes(15), Now));
-        Assert.Contains("changed", RemoteTunePolicy.RejectionReason(command with { ExpectedSequence = 11 }, snapshot, Now.AddMinutes(15), Now));
+        Assert.Null(RemoteTunePolicy.RejectionReason(command with { ExpectedSequence = 11 }, snapshot, Now.AddMinutes(15), Now));
+        Assert.Contains("changed", RemoteTunePolicy.RejectionReason(command with { ExpectedSequence = 13 }, snapshot, Now.AddMinutes(15), Now));
+        Assert.Contains("changed", RemoteTunePolicy.RejectionReason(command with { ExpectedFrequencyHz = 92_400_000 }, snapshot, Now.AddMinutes(15), Now));
         Assert.Contains("bounds", RemoteTunePolicy.RejectionReason(command with { FrequencyHz = 999 }, snapshot, Now.AddMinutes(15), Now));
     }
 

@@ -8,7 +8,7 @@
     "protocol": { "const": "1.0" },
     "type": {
       "type": "string",
-      "enum": ["hello", "welcome", "radio.snapshot", "radio.state.changed", "context.request", "context.candidates", "logbook.create", "logbook.result", "wishlist.mutate", "wishlist.result", "error"]
+      "enum": ["hello", "welcome", "radio.snapshot", "radio.state.changed", "bridge.status", "context.request", "context.candidates", "context.error", "command.remote-tune.request", "command.tune", "command.tune.result", "command.logbook", "command.result", "command.wishlist", "logbook.create", "logbook.result", "wishlist.mutate", "wishlist.result", "error"]
     },
     "id": { "$ref": "common.schema.json#/$defs/uuid" },
     "sequence": { "type": "integer", "minimum": 0 },

@@ -62,11 +62,20 @@ WebSocket. The relay is ephemeral: it does not store VFO state in D1/R2 and does
 not transmit audio, IQ, FFT, waterfall, hardware serials, or listening history.
 
 Browser tuning remains independently locked. It is available only after the
-user selects **Allow browser tuning for 15 minutes…** in the local Bridge tray
-and confirms the warning. Every tune command expires after 15 seconds, must
-match the current tuner sequence/frequency, is revalidated inside the SDR#
-plugin, and is acknowledged back to the browser. The permission is never
-persisted and returns to locked when the Bridge restarts or the timer expires.
+user selects **Allow browser tuning for 15 minutes…** in the local Bridge tray,
+or clicks **Enable browser tuning (15 min)** in the SDR# panel, and confirms the
+local warning. Every tune command expires after 15 seconds, must match the
+current frequency and a current-or-earlier tuner sequence, is revalidated
+inside the SDR# plugin, and is acknowledged back to the browser. Signal-only
+snapshot updates therefore do not invalidate a fresh command. The permission
+is never persisted and returns to locked when the Bridge restarts or the timer
+expires.
+
+The panel reports the local pipe, cloud API, live WebSocket and browser-tuning
+permission separately. Candidate lookups are keyed only by catalog-relevant
+tuner state, so rapidly changing signal readings cannot continuously cancel a
+lookup. Transient catalog failures are shown in the panel and retried by the
+Bridge heartbeat instead of leaving stale or empty UI.
 
 The SDR# plugin can also draw a lightweight local station marker on the
 spectrum analyzer for the current catalog channel. It uses the public

@@ -36,7 +36,13 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private ReceptionSetupContext? _receptionSetup;
     private SequencedRadioSnapshot? _latestRadioSnapshot;
     private CandidateContextResponse? _latestCandidateContext;
+    private CandidateQueryKey? _candidateQueryKey;
     private volatile bool _liveEnabled;
+    private volatile bool _liveConnected;
+    private string? _liveError;
+    private string _cloudState = "checking";
+    private string? _statusCode;
+    private string _statusMessage = "Checking DXNexus cloud services…";
     private DateTimeOffset _remoteTuneUntil;
 
     public BridgeApplicationContext()
@@ -73,8 +79,9 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _pipeServer.MessageReceived += HandleMessageReceived;
         _pipeServer.Start();
         _syncTimer = new System.Threading.Timer(_ => _ = SynchronizeOfflineMutationsAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
-        _liveHeartbeatTimer = new System.Threading.Timer(_ => _ = PublishLiveStateAsync(), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+        _liveHeartbeatTimer = new System.Threading.Timer(_ => _ = HeartbeatAsync(), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
         _liveCompanion.TuneCommandReceived += HandleRemoteTuneCommand;
+        _liveCompanion.ConnectionChanged += HandleLiveConnectionChanged;
         _ = InitializePreferencesAsync();
     }
 
@@ -90,6 +97,14 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         if (choice != DialogResult.Yes) return;
         _remoteTuneUntil = DateTimeOffset.UtcNow.AddMinutes(15);
         _remoteTuneMenu.Text = "Browser tuning allowed · 15 min";
+        _ = PublishBridgeStatusAsync();
+    }
+
+    private void HandleLiveConnectionChanged(object? sender, LiveConnectionStatus status)
+    {
+        _liveConnected = status.Connected;
+        _liveError = status.Connected ? null : status.Error;
+        _ = PublishBridgeStatusAsync();
     }
 
     private void HandleRemoteTuneCommand(object? sender, RemoteTuneCommand command) => _ = ApplyRemoteTuneCommandAsync(command);
@@ -137,6 +152,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
             var preferences = await _preferencesStore.LoadAsync().ConfigureAwait(false);
             _liveEnabled = preferences.LiveBrowserCompanion;
             _uiContext.Post(_ => _liveMenu.Checked = _liveEnabled, null);
+            await PublishBridgeStatusAsync().ConfigureAwait(false);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
@@ -154,6 +170,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                 await _preferencesStore.SaveAsync(preferences with { LiveBrowserCompanion = enabled }).ConfigureAwait(false);
             if (enabled) await PublishLiveStateAsync().ConfigureAwait(false);
             else await _liveCompanion.DisconnectAsync().ConfigureAwait(false);
+            await PublishBridgeStatusAsync().ConfigureAwait(false);
         }
         catch (Exception error) when (IsTransient(error) || error is IOException or UnauthorizedAccessException)
         {
@@ -174,7 +191,11 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private void ShowReceptionSetup()
     {
         using var form = new ReceptionSetupForm(_apiClient, _preferencesStore);
-        if (form.ShowDialog() == DialogResult.OK) _receptionSetup = form.SelectedSetup;
+        if (form.ShowDialog() != DialogResult.OK) return;
+        _receptionSetup = form.SelectedSetup;
+        _candidateQueryKey = null;
+        _latestCandidateContext = null;
+        if (_latestRadioSnapshot is { } snapshot) _ = RefreshCandidatesAsync(snapshot);
     }
 
     private void HandleConnectionChanged(object? sender, bool connected)
@@ -185,6 +206,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                 ? "DXNexus Bridge — SDR# connected"
                 : BridgeIdentity.ProductName;
         }, null);
+        _ = PublishBridgeStatusAsync();
     }
 
     private void HandleMessageReceived(object? sender, PipeEnvelope message)
@@ -193,6 +215,11 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         {
             var result = message.Payload.Deserialize<RemoteTuneResult>(JsonOptions);
             if (result is not null) _ = PublishTuneResultSafelyAsync(result);
+            return;
+        }
+        if (message.Type == "command.remote-tune.request")
+        {
+            _uiContext.Post(_ => EnableRemoteTuning(), null);
             return;
         }
         if (message.Type == "command.wishlist")
@@ -216,13 +243,19 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         }
 
         _latestRadioSnapshot = snapshot;
-        _latestCandidateContext = null;
+        var candidateKey = CandidateQueryKey.From(snapshot);
+        var refreshCandidates = _candidateQueryKey != candidateKey;
+        if (refreshCandidates)
+        {
+            _candidateQueryKey = candidateKey;
+            _latestCandidateContext = null;
+        }
 
         _uiContext.Post(_ =>
         {
             _notifyIcon.Text = $"DXNexus — {FormatFrequency(snapshot.Radio.FrequencyHz)}";
         }, null);
-        _ = RefreshCandidatesAsync(snapshot);
+        if (refreshCandidates) _ = RefreshCandidatesAsync(snapshot);
         _ = PublishLiveStateAsync();
     }
 
@@ -393,9 +426,21 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         try
         {
             await Task.Delay(450, query.Token).ConfigureAwait(false);
-            if (!_credentialStore.Exists) return;
+            if (!_credentialStore.Exists)
+            {
+                await ReportCandidateErrorAsync(
+                    snapshot.Sequence,
+                    new BridgeError("not-paired", "Connect this Bridge to DXNexus first.", false)).ConfigureAwait(false);
+                return;
+            }
             var setup = await ResolveReceptionSetupAsync(query.Token).ConfigureAwait(false);
-            if (setup is null) return;
+            if (setup is null)
+            {
+                await ReportCandidateErrorAsync(
+                    snapshot.Sequence,
+                    new BridgeError("setup-required", "Choose a Listening Point and receiver in Reception setup.", false)).ConfigureAwait(false);
+                return;
+            }
             var response = await _apiClient.GetCandidatesAsync(new CandidateContextRequest(
                 Protocol.Version,
                 Guid.CreateVersion7(),
@@ -409,29 +454,64 @@ internal sealed class BridgeApplicationContext : ApplicationContext
                 20), query.Token).ConfigureAwait(false);
             if (!query.IsCancellationRequested)
             {
+                _cloudState = "connected";
+                _statusCode = null;
+                _statusMessage = "DXNexus cloud connected.";
                 _latestCandidateContext = CompactLiveCandidates(response);
                 await _pipeServer.SendAsync("context.candidates", response.Sequence, response, query.Token)
                     .ConfigureAwait(false);
                 await PublishLiveStateAsync(query.Token).ConfigureAwait(false);
+                await PublishBridgeStatusAsync(query.Token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (query.IsCancellationRequested)
         {
         }
+        catch (DxnexusApiException error)
+        {
+            await ReportCandidateErrorAsync(
+                snapshot.Sequence,
+                new BridgeError(error.Code ?? "cloud-error", error.Message, IsTransient(error))).ConfigureAwait(false);
+        }
         catch (HttpRequestException error)
         {
-            await _pipeServer.SendAsync("context.error", snapshot.Sequence, new
-            {
-                code = "cloud-unavailable",
-                message = error.StatusCode is null
-                    ? "DXNexus is temporarily unreachable."
-                    : $"DXNexus returned HTTP {(int)error.StatusCode}.",
-            }, CancellationToken.None).ConfigureAwait(false);
+            await ReportCandidateErrorAsync(
+                snapshot.Sequence,
+                new BridgeError(
+                    "cloud-unavailable",
+                    error.StatusCode is null
+                        ? "DXNexus is temporarily unreachable."
+                        : $"DXNexus returned HTTP {(int)error.StatusCode}.")).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException error)
         {
-            // The device is not paired yet; the tray pairing action is the recovery path.
+            await ReportCandidateErrorAsync(
+                snapshot.Sequence,
+                new BridgeError("not-paired", error.Message, false)).ConfigureAwait(false);
         }
+        catch (Exception error) when (error is InvalidDataException or JsonException)
+        {
+            await ReportCandidateErrorAsync(
+                snapshot.Sequence,
+                new BridgeError("invalid-response", $"DXNexus returned an invalid response: {error.Message}", false)).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (ReferenceEquals(_candidateQuery, query))
+            {
+                _candidateQuery = null;
+                query.Dispose();
+            }
+        }
+    }
+
+    private async Task ReportCandidateErrorAsync(long sequence, BridgeError error)
+    {
+        _cloudState = error.Transient ? "degraded" : "action-required";
+        _statusCode = error.Code;
+        _statusMessage = error.Message;
+        await _pipeServer.SendAsync("context.error", sequence, error, CancellationToken.None).ConfigureAwait(false);
+        await PublishBridgeStatusAsync().ConfigureAwait(false);
     }
 
     private static CandidateContextResponse CompactLiveCandidates(CandidateContextResponse response) => response with
@@ -478,6 +558,36 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         }
     }
 
+    private async Task HeartbeatAsync()
+    {
+        var snapshot = _latestRadioSnapshot;
+        if (snapshot is not null && _latestCandidateContext is null && _candidateQuery is null)
+            await RefreshCandidatesAsync(snapshot).ConfigureAwait(false);
+        await PublishLiveStateAsync().ConfigureAwait(false);
+        await PublishBridgeStatusAsync().ConfigureAwait(false);
+    }
+
+    private Task<bool> PublishBridgeStatusAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? remoteUntil = _remoteTuneUntil > now ? _remoteTuneUntil : null;
+        var code = _statusCode ?? (!string.IsNullOrWhiteSpace(_liveError) ? "live-disconnected" : null);
+        var message = _statusMessage;
+        if (_liveEnabled && !_liveConnected && !string.IsNullOrWhiteSpace(_liveError))
+            message = $"{message} Live browser connection is retrying.";
+        var status = new BridgeServiceStatus(
+            "bridge.status",
+            Protocol.Version,
+            _credentialStore.Exists,
+            _cloudState,
+            _liveEnabled,
+            _liveConnected,
+            remoteUntil,
+            code,
+            message);
+        return _pipeServer.SendAsync("bridge.status", _latestRadioSnapshot?.Sequence ?? 0, status, cancellationToken);
+    }
+
     private static string FormatFrequency(long frequencyHz) => frequencyHz >= 1_000_000
         ? $"{frequencyHz / 1_000_000d:0.000} MHz"
         : $"{frequencyHz / 1_000d:0.0} kHz";
@@ -492,6 +602,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _pipeServer.ConnectionChanged -= HandleConnectionChanged;
         _pipeServer.MessageReceived -= HandleMessageReceived;
         _liveCompanion.TuneCommandReceived -= HandleRemoteTuneCommand;
+        _liveCompanion.ConnectionChanged -= HandleLiveConnectionChanged;
         _pipeServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _liveCompanion.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _apiClient.Dispose();

@@ -28,11 +28,14 @@ This directory is the canonical machine-readable contract shared by:
 - `pairing.schema.json`: browser-assisted device authorization messages.
 - `logbook-create.schema.json`: explicit, idempotent quick-log mutation.
 - `wishlist-mutation.schema.json`: explicit target add/remove mutation.
+- `live-state.schema.json`: ephemeral SDR# state sent to the private browser companion.
+- `live-command.schema.json`: short-lived browser tune commands and acknowledgements.
 - `problem.schema.json`: stable API error representation.
-- `pipe-envelope.schema.json`: framed Plugin/Bridge message envelope.
+- `pipe-envelope.schema.json`: framed Plugin/Bridge messages, including cloud
+  errors, service status and locally confirmed tune requests.
 
-`openapi.json` documents the initial HTTPS API. Live WSS and remote-control
-commands are intentionally excluded from the first release.
+`openapi.json` documents the HTTPS API and live Bridge WebSocket upgrade. The
+browser-side command route remains private to the authenticated web session.
 
 Run `npm test` at the repository root to compile every schema and validate all
 examples.

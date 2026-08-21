@@ -20,6 +20,16 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
                 var candidates = message.Payload.Deserialize<CandidateContextResponse>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
                 if (candidates is not null) CandidatesReceived?.Invoke(this, candidates);
             }
+            else if (message.Type == "context.error")
+            {
+                var error = message.Payload.Deserialize<BridgeError>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (error is not null) ContextErrorReceived?.Invoke(this, error);
+            }
+            else if (message.Type == "bridge.status")
+            {
+                var status = message.Payload.Deserialize<BridgeServiceStatus>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (status is not null) BridgeStatusReceived?.Invoke(this, status);
+            }
             else if (message.Type == "command.result")
             {
                 var result = message.Payload.Deserialize<CommandResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -36,6 +46,8 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
     public bool IsConnected => _client.IsConnected;
     public event EventHandler<PipeEnvelope>? MessageReceived;
     public event EventHandler<CandidateContextResponse>? CandidatesReceived;
+    public event EventHandler<BridgeError>? ContextErrorReceived;
+    public event EventHandler<BridgeServiceStatus>? BridgeStatusReceived;
     public event EventHandler<CommandResult>? CommandCompleted;
     public event EventHandler<RemoteTuneCommand>? TuneRequested;
     public Task ConnectAsync(CancellationToken cancellationToken) => _client.ConnectAsync(cancellationToken);
@@ -47,5 +59,11 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
         _client.SendAsync("command.logbook", sequence, command, cancellationToken);
     public Task SendTuneResultAsync(RemoteTuneResult result, long sequence, CancellationToken cancellationToken = default) =>
         _client.SendAsync("command.tune.result", sequence, result, cancellationToken);
+    public Task RequestRemoteTuningAsync(long sequence, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(
+            "command.remote-tune.request",
+            sequence,
+            new RemoteTuningAuthorizationRequest(Guid.CreateVersion7()),
+            cancellationToken);
     public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

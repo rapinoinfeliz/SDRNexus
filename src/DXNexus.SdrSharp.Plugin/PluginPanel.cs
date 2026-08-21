@@ -10,6 +10,9 @@ internal sealed class PluginPanel : UserControl
     private readonly PipeRadioStateSink _sink;
     private readonly SpectrumOverlayController _spectrumOverlay;
     private readonly Label _statusLabel;
+    private readonly Label _cloudStatusLabel;
+    private readonly Label _liveStatusLabel;
+    private readonly Button _remoteTuneButton;
     private readonly Label _frequencyLabel;
     private readonly Label _modeLabel;
     private readonly Label _candidateStatusLabel;
@@ -22,6 +25,7 @@ internal sealed class PluginPanel : UserControl
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         _spectrumOverlay = spectrumOverlay ?? throw new ArgumentNullException(nameof(spectrumOverlay));
+        _latestSnapshot = _collector.CaptureFullSnapshot();
         AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = Color.FromArgb(15, 31, 43);
         ForeColor = Color.WhiteSmoke;
@@ -49,6 +53,48 @@ internal sealed class PluginPanel : UserControl
         {
             AutoSize = true,
             ForeColor = Color.FromArgb(105, 210, 255),
+        };
+
+        _cloudStatusLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(320, 0),
+            ForeColor = Color.FromArgb(170, 185, 195),
+            Text = "DXNexus cloud: checking…",
+        };
+
+        _liveStatusLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(320, 0),
+            ForeColor = Color.FromArgb(170, 185, 195),
+            Text = "Browser companion: checking…",
+        };
+
+        _remoteTuneButton = new Button
+        {
+            AutoSize = true,
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = Color.FromArgb(155, 215, 255),
+            Margin = new Padding(0, 7, 0, 0),
+            Text = "Enable browser tuning (15 min)",
+        };
+        _remoteTuneButton.Click += async (_, _) =>
+        {
+            _remoteTuneButton.Enabled = false;
+            try
+            {
+                await _sink.RequestRemoteTuningAsync(_latestSnapshot.Sequence);
+            }
+            catch (Exception error)
+            {
+                _liveStatusLabel.Text = $"Could not request browser tuning: {error.Message}";
+                _liveStatusLabel.ForeColor = Color.FromArgb(255, 140, 140);
+            }
+            finally
+            {
+                _remoteTuneButton.Enabled = true;
+            }
         };
 
         _frequencyLabel = new Label
@@ -91,6 +137,9 @@ internal sealed class PluginPanel : UserControl
         };
         layout.Controls.Add(title);
         layout.Controls.Add(_statusLabel);
+        layout.Controls.Add(_cloudStatusLabel);
+        layout.Controls.Add(_liveStatusLabel);
+        layout.Controls.Add(_remoteTuneButton);
         layout.Controls.Add(_frequencyLabel);
         layout.Controls.Add(_modeLabel);
         layout.Controls.Add(spectrumOverlayToggle);
@@ -101,8 +150,9 @@ internal sealed class PluginPanel : UserControl
         _collector.SnapshotChanged += HandleSnapshotChanged;
         _publisher.ConnectionStateChanged += HandleConnectionStateChanged;
         _sink.CandidatesReceived += HandleCandidatesReceived;
+        _sink.ContextErrorReceived += HandleContextErrorReceived;
+        _sink.BridgeStatusReceived += HandleBridgeStatusReceived;
         _sink.CommandCompleted += HandleCommandCompleted;
-        _latestSnapshot = _collector.CaptureFullSnapshot();
         Render(_latestSnapshot);
         RenderConnectionState(_publisher.State);
     }
@@ -119,6 +169,67 @@ internal sealed class PluginPanel : UserControl
         _candidateStatusLabel.ForeColor = result.Success
             ? Color.FromArgb(84, 226, 159)
             : Color.FromArgb(255, 140, 140);
+    }
+
+    private void HandleContextErrorReceived(object? sender, BridgeError error)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => HandleContextErrorReceived(sender, error));
+            return;
+        }
+        _candidateList.Controls.Clear();
+        _candidateStatusLabel.Text = error.Code == "catalog-unavailable"
+            ? "The DXNexus station catalog is temporarily unavailable. Retrying automatically…"
+            : error.Message;
+        _candidateStatusLabel.ForeColor = error.Transient
+            ? Color.FromArgb(255, 196, 96)
+            : Color.FromArgb(255, 140, 140);
+    }
+
+    private void HandleBridgeStatusReceived(object? sender, BridgeServiceStatus status)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => HandleBridgeStatusReceived(sender, status));
+            return;
+        }
+
+        _cloudStatusLabel.Text = status.CloudState switch
+        {
+            "connected" => "DXNexus cloud connected",
+            "degraded" => $"DXNexus cloud degraded · {status.Message}",
+            "action-required" => status.Message,
+            _ => "DXNexus cloud: checking…",
+        };
+        _cloudStatusLabel.ForeColor = status.CloudState == "connected"
+            ? Color.FromArgb(84, 226, 159)
+            : status.CloudState == "degraded"
+                ? Color.FromArgb(255, 196, 96)
+                : Color.FromArgb(170, 185, 195);
+
+        _liveStatusLabel.Text = !status.LiveEnabled
+            ? "Browser companion disabled in the Bridge"
+            : status.LiveConnected
+                ? "Live browser connected"
+                : "Live browser reconnecting…";
+        _liveStatusLabel.ForeColor = status.LiveConnected
+            ? Color.FromArgb(84, 226, 159)
+            : Color.FromArgb(255, 196, 96);
+
+        if (status.RemoteTuningUntil is { } until && until > DateTimeOffset.UtcNow)
+        {
+            var minutes = Math.Max(1, (int)Math.Ceiling((until - DateTimeOffset.UtcNow).TotalMinutes));
+            _remoteTuneButton.Text = $"Browser tuning enabled ({minutes} min)";
+            _remoteTuneButton.ForeColor = Color.FromArgb(84, 226, 159);
+        }
+        else
+        {
+            _remoteTuneButton.Text = "Enable browser tuning (15 min)";
+            _remoteTuneButton.ForeColor = Color.FromArgb(155, 215, 255);
+        }
     }
 
     private void HandleCandidatesReceived(object? sender, CandidateContextResponse response)
@@ -139,6 +250,7 @@ internal sealed class PluginPanel : UserControl
         _candidateStatusLabel.Text = response.Candidates.Length == 0
             ? "No catalog candidate on this exact frequency."
             : $"{response.Candidates.Length} candidate{(response.Candidates.Length == 1 ? "" : "s")} · {response.Band}";
+        _candidateStatusLabel.ForeColor = Color.FromArgb(170, 185, 195);
         foreach (var candidate in response.Candidates.Take(6))
         {
             var received = candidate.Received.AtListeningPoint ? " · heard here" : candidate.Wishlisted ? " · target" : "";
@@ -261,6 +373,12 @@ internal sealed class PluginPanel : UserControl
 
     private void Render(SequencedRadioSnapshot snapshot)
     {
+        if (_latestSnapshot is not null && _latestSnapshot.Radio.FrequencyHz != snapshot.Radio.FrequencyHz)
+        {
+            _candidateStatusLabel.Text = "Loading station candidates…";
+            _candidateStatusLabel.ForeColor = Color.FromArgb(170, 185, 195);
+            _candidateList.Controls.Clear();
+        }
         _latestSnapshot = snapshot;
         _frequencyLabel.Text = FormatFrequency(snapshot.Radio.FrequencyHz);
         _modeLabel.Text = $"{snapshot.Radio.Detector.ToString().ToUpperInvariant()} · {snapshot.Radio.FilterBandwidthHz / 1_000d:0.#} kHz";
@@ -280,6 +398,8 @@ internal sealed class PluginPanel : UserControl
             _collector.SnapshotChanged -= HandleSnapshotChanged;
             _publisher.ConnectionStateChanged -= HandleConnectionStateChanged;
             _sink.CandidatesReceived -= HandleCandidatesReceived;
+            _sink.ContextErrorReceived -= HandleContextErrorReceived;
+            _sink.BridgeStatusReceived -= HandleBridgeStatusReceived;
             _sink.CommandCompleted -= HandleCommandCompleted;
         }
 

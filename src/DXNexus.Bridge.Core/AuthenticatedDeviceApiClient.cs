@@ -24,7 +24,7 @@ public sealed class AuthenticatedDeviceApiClient(
         using var response = await SendAsync(
             () => new HttpRequestMessage(HttpMethod.Get, "device"),
             cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<DeviceConnectionStatus>(JsonOptions, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidDataException("DXNexus returned an empty device status.");
@@ -35,7 +35,7 @@ public sealed class AuthenticatedDeviceApiClient(
         using var response = await SendAsync(
             () => new HttpRequestMessage(HttpMethod.Get, "setup"),
             cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<ReceptionSetupResponse>(JsonOptions, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidDataException("DXNexus returned an empty reception setup.");
@@ -52,7 +52,7 @@ public sealed class AuthenticatedDeviceApiClient(
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
             },
             cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<CandidateContextResponse>(JsonOptions, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidDataException("DXNexus returned an empty candidate response.");
@@ -96,7 +96,7 @@ public sealed class AuthenticatedDeviceApiClient(
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
             }, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<WishlistMutationResponse>(JsonOptions, cancellationToken)
             .ConfigureAwait(false) ?? throw new InvalidDataException("DXNexus returned an empty wishlist response.");
     }
@@ -111,7 +111,7 @@ public sealed class AuthenticatedDeviceApiClient(
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
             }, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<MutationResponse>(JsonOptions, cancellationToken)
             .ConfigureAwait(false) ?? throw new InvalidDataException("DXNexus returned an empty logbook response.");
     }
@@ -191,7 +191,7 @@ public sealed class AuthenticatedDeviceApiClient(
                 new { type = "token.refresh.request", refreshToken = current.RefreshToken, proof },
                 JsonOptions,
                 cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
             var token = await response.Content.ReadFromJsonAsync<PairingTokenResponse>(JsonOptions, cancellationToken)
                 .ConfigureAwait(false)
                 ?? throw new InvalidDataException("DXNexus returned an empty refreshed credential.");
@@ -218,6 +218,28 @@ public sealed class AuthenticatedDeviceApiClient(
         .Replace('+', '-')
         .Replace('/', '_');
 
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode) return;
+        string? code = null;
+        string? apiMessage = null;
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var json = JsonDocument.Parse(body);
+            if (json.RootElement.TryGetProperty("code", out var codeElement)) code = codeElement.GetString();
+            if (json.RootElement.TryGetProperty("error", out var errorElement)) apiMessage = errorElement.GetString();
+        }
+        catch (Exception error) when (error is JsonException or InvalidOperationException)
+        {
+        }
+
+        var message = string.IsNullOrWhiteSpace(apiMessage)
+            ? $"DXNexus returned HTTP {(int)response.StatusCode}."
+            : apiMessage;
+        throw new DxnexusApiException(message, response.StatusCode, code);
+    }
+
     public void Dispose()
     {
         if (_credential is not null) CryptographicOperations.ZeroMemory(_credential.PrivateKeyPkcs8);
@@ -240,3 +262,11 @@ public sealed record WebSocketAuthentication(
     string Authorization,
     string Dpop,
     DateTimeOffset ExpiresAt);
+
+public sealed class DxnexusApiException(
+    string message,
+    HttpStatusCode statusCode,
+    string? code) : HttpRequestException(message, null, statusCode)
+{
+    public string? Code { get; } = code;
+}

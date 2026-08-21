@@ -13,8 +13,11 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
     private CancellationTokenSource? _receiveStop;
     private Task? _receiveTask;
     private DateTimeOffset _reconnectBefore;
+    private bool _connected;
 
     public event EventHandler<RemoteTuneCommand>? TuneCommandReceived;
+    public event EventHandler<LiveConnectionStatus>? ConnectionChanged;
+    public bool IsConnected => _connected && _socket?.State == WebSocketState.Open;
 
     public async Task<bool> PublishAsync(LiveBrowserState state, CancellationToken cancellationToken = default)
         => await SendPayloadAsync(state, cancellationToken).ConfigureAwait(false);
@@ -40,6 +43,7 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
             catch (Exception error) when (error is WebSocketException or IOException or ObjectDisposedException)
             {
                 DisposeSocket();
+                SetConnection(false, error.Message);
                 return false;
             }
         }
@@ -61,6 +65,7 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
                 catch (WebSocketException) { }
             }
             DisposeSocket();
+            SetConnection(false, null);
         }
         finally { _sendGate.Release(); }
     }
@@ -81,10 +86,12 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
             _reconnectBefore = DateTimeOffset.UtcNow.AddMinutes(4);
             _receiveStop = new CancellationTokenSource();
             _receiveTask = ReceiveAsync(socket, _receiveStop.Token);
+            SetConnection(true, null);
         }
-        catch
+        catch (Exception error)
         {
             socket.Dispose();
+            SetConnection(false, error.Message);
             throw;
         }
     }
@@ -112,7 +119,22 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception error) when (error is WebSocketException or IOException or InvalidDataException or JsonException) { }
+        catch (Exception error) when (error is WebSocketException or IOException or InvalidDataException or JsonException)
+        {
+            SetConnection(false, error.Message);
+        }
+        finally
+        {
+            if (ReferenceEquals(_socket, socket) && socket.State != WebSocketState.Open)
+                SetConnection(false, null);
+        }
+    }
+
+    private void SetConnection(bool connected, string? error)
+    {
+        if (_connected == connected && error is null) return;
+        _connected = connected;
+        ConnectionChanged?.Invoke(this, new LiveConnectionStatus(connected, error));
     }
 
     private void DisposeSocket()
@@ -130,6 +152,9 @@ public sealed class LiveCompanionClient(AuthenticatedDeviceApiClient apiClient) 
     {
         await DisconnectAsync().ConfigureAwait(false);
         TuneCommandReceived = null;
+        ConnectionChanged = null;
         _sendGate.Dispose();
     }
 }
+
+public sealed record LiveConnectionStatus(bool Connected, string? Error);
