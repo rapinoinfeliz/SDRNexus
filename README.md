@@ -53,8 +53,10 @@ receiver saved in DXNexus, and returns the ranked exact-frequency candidates
 to the plugin. The panel shows distance, bearing, modeled field strength, and
 received/wishlist state. **Target** updates Want to hear, while **Log** opens a
 small explicit confirmation form and saves the reception with the current SDR
-snapshot and selected setup. Credentials remain inside the Bridge and no log
-is created without a user action.
+snapshot and selected setup. **Stream** opens the same contextual Google search
+used by DXNexus (frequency, band and municipality) in the default browser.
+Credentials remain inside the Bridge and no log is created without a user
+action.
 
 Explicit log and wishlist mutations use client-generated idempotency IDs. If
 DXNexus is temporarily unavailable, the Bridge stores them in a per-user local

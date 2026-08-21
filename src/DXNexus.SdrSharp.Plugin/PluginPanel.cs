@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DXNexus.Contracts;
 using DXNexus.Plugin.Core;
 
@@ -308,9 +309,34 @@ internal sealed class PluginPanel : UserControl
                 }
                 finally { log.Enabled = true; }
             };
+            var stream = new Button
+            {
+                AutoSize = true,
+                FlatStyle = FlatStyle.Flat,
+                Text = "Stream",
+                ForeColor = Color.FromArgb(155, 215, 255),
+            };
+            stream.Click += (_, _) =>
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(StationStreamSearch.BuildGoogleUri(candidate).AbsoluteUri)
+                    {
+                        UseShellExecute = true,
+                    });
+                    _candidateStatusLabel.Text = $"Opening stream search for {candidate.StationName}…";
+                    _candidateStatusLabel.ForeColor = Color.FromArgb(84, 226, 159);
+                }
+                catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    _candidateStatusLabel.Text = $"Could not open stream search: {error.Message}";
+                    _candidateStatusLabel.ForeColor = Color.FromArgb(255, 140, 140);
+                }
+            };
             var actions = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 3, 0, 0) };
             actions.Controls.Add(target);
             actions.Controls.Add(log);
+            actions.Controls.Add(stream);
             var row = new FlowLayoutPanel
             {
                 AutoSize = true,
