@@ -17,5 +17,7 @@ if (Test-Path $statePath) {
 }
 $shortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'DXNexus Bridge.lnk'
 if (Test-Path $shortcut) { Remove-Item $shortcut -Force }
+$programShortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'DXNexus Bridge.lnk'
+if (Test-Path $programShortcut) { Remove-Item $programShortcut -Force }
 Write-Host 'SDRNexus plugin files and startup shortcut removed.'
 Write-Host "You may now remove $bridgeDirectory. Credentials and offline data under LocalAppData\DXNexus were preserved."

@@ -1,20 +1,70 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateScript({
-        (Test-Path (Join-Path $_ 'SDRSharp.exe')) -or
-        (Test-Path (Join-Path $_ 'SDRSharp.dotnet9.exe')) -or
-        (Test-Path (Join-Path $_ 'SDRSharp.dotnet8.exe'))
-    })]
     [string]$SdrSharpPath,
     [switch]$NoStartup
 )
 
 $ErrorActionPreference = 'Stop'
-$SdrSharpPath = (Resolve-Path $SdrSharpPath).Path
-if (Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'SDRSharp*' }) {
-    throw 'Close SDR# before installing SDRNexus.'
+$interactiveInstall = [string]::IsNullOrWhiteSpace($SdrSharpPath)
+$launchers = @('SDRSharp.dotnet9.exe', 'SDRSharp.dotnet8.exe', 'SDRSharp.exe')
+
+function Test-SdrSharpDirectory([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Container)) {
+        return $false
+    }
+    foreach ($launcher in $launchers) {
+        if (Test-Path -LiteralPath (Join-Path $Path $launcher) -PathType Leaf) { return $true }
+    }
+    return $false
 }
+
+if ($interactiveInstall) {
+    Add-Type -AssemblyName System.Windows.Forms
+    $knownPaths = @(@(
+        (Join-Path $env:USERPROFILE 'Downloads\sdrsharp-x86'),
+        (Join-Path $env:USERPROFILE 'Desktop\sdrsharp-x86'),
+        'C:\SDRSharp',
+        'C:\sdrsharp-x86',
+        'D:\sdrsharp-x86'
+    ) | Where-Object { Test-SdrSharpDirectory $_ } | Select-Object -Unique)
+
+    if (@($knownPaths).Count -eq 1) {
+        $SdrSharpPath = $knownPaths[0]
+    }
+    else {
+        $picker = New-Object System.Windows.Forms.FolderBrowserDialog
+        $picker.Description = 'Select the SDR# folder (the folder containing SDRSharp.exe or SDRSharp.dotnet9.exe).'
+        $picker.ShowNewFolderButton = $false
+        if (@($knownPaths).Count -gt 0) { $picker.SelectedPath = $knownPaths[0] }
+        if ($picker.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+            throw 'Installation canceled.'
+        }
+        $SdrSharpPath = $picker.SelectedPath
+    }
+}
+
+if (-not (Test-SdrSharpDirectory $SdrSharpPath)) {
+    throw "SDR# was not found in '$SdrSharpPath'. Select the folder containing SDRSharp.exe or SDRSharp.dotnet9.exe."
+}
+
+$SdrSharpPath = (Resolve-Path $SdrSharpPath).Path
+$runningSdrSharp = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'SDRSharp*' }
+if ($runningSdrSharp) {
+    $closeSdrSharp = $false
+    if ($interactiveInstall) {
+        $choice = [System.Windows.Forms.MessageBox]::Show(
+            'SDR# must be closed while the plugin is installed. Close it now and continue?',
+            'Install SDRNexus',
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question)
+        $closeSdrSharp = $choice -eq [System.Windows.Forms.DialogResult]::Yes
+    }
+    if (-not $closeSdrSharp) { throw 'Close SDR# before installing SDRNexus.' }
+    $runningSdrSharp | Stop-Process -Force
+    $runningSdrSharp | ForEach-Object { $_.WaitForExit(5000) }
+}
+
+Get-Process DXNexus.Bridge -ErrorAction SilentlyContinue | Stop-Process -Force
 
 $configPath = Join-Path $SdrSharpPath 'SDRSharp.config'
 $pluginDirectory = $SdrSharpPath
@@ -46,7 +96,31 @@ if (-not $NoStartup) {
     $shortcut.Description = 'DXNexus companion for SDR#'
     $shortcut.Save()
 }
-Start-Process (Join-Path $bridgeDirectory 'DXNexus.Bridge.exe') -WindowStyle Hidden
+
+$programs = [Environment]::GetFolderPath('Programs')
+$programShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $programs 'DXNexus Bridge.lnk'))
+$programShortcut.TargetPath = Join-Path $bridgeDirectory 'DXNexus.Bridge.exe'
+$programShortcut.WorkingDirectory = $bridgeDirectory
+$programShortcut.IconLocation = "$(Join-Path $bridgeDirectory 'DXNexus.Bridge.exe'),0"
+$programShortcut.Description = 'DXNexus companion for SDR#'
+$programShortcut.Save()
+
+$credentialPath = Join-Path $env:LOCALAPPDATA 'DXNexus\device-credential.bin'
+$bridgeExecutable = Join-Path $bridgeDirectory 'DXNexus.Bridge.exe'
+if (Test-Path $credentialPath) {
+    Start-Process $bridgeExecutable -WorkingDirectory $bridgeDirectory -WindowStyle Hidden
+}
+else {
+    Start-Process $bridgeExecutable -ArgumentList '--pair' -WorkingDirectory $bridgeDirectory -WindowStyle Hidden
+}
 Write-Host 'SDRNexus installed. Restart SDR# and open Radio tools -> DXNexus.'
 Write-Host "Plugin directory: $pluginDirectory"
 Write-Host "Bridge directory: $bridgeDirectory"
+
+if ($interactiveInstall) {
+    [System.Windows.Forms.MessageBox]::Show(
+        "SDRNexus was installed successfully.`n`nOpen SDR# and choose Radio tools > DXNexus.`nOn first install, approve the DXNexus connection in your browser.",
+        'SDRNexus installed',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+}

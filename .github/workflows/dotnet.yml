@@ -53,6 +53,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: SDRNexus-windows-x64
-          path: artifacts/SDRNexus-0.1.0-win-x64.zip
+          path: |
+            artifacts/SDRNexus-0.1.0-windows-x64.zip
+            artifacts/SDRNexus-0.1.0-windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14

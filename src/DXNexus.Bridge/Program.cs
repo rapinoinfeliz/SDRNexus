@@ -8,10 +8,10 @@ namespace DXNexus.Bridge;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new BridgeApplicationContext());
+        Application.Run(new BridgeApplicationContext(args.Contains("--pair", StringComparer.OrdinalIgnoreCase)));
     }
 }
 
@@ -47,7 +47,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
     private string _statusMessage = "Checking DXNexus cloud services…";
     private DateTimeOffset _remoteTuneUntil;
 
-    public BridgeApplicationContext()
+    public BridgeApplicationContext(bool showPairingOnStart = false)
     {
         _uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _credentialStore = new DeviceCredentialStore();
@@ -87,6 +87,7 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         _liveCompanion.TuneCommandReceived += HandleRemoteTuneCommand;
         _liveCompanion.ConnectionChanged += HandleLiveConnectionChanged;
         _ = InitializePreferencesAsync();
+        if (showPairingOnStart) _uiContext.Post(_ => ShowPairing(), null);
     }
 
     private void EnableRemoteTuning()

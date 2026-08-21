@@ -1,0 +1,35 @@
+SDRNexus 0.1.0 - quick installation
+===================================
+
+Requirements
+------------
+- Windows 10 or Windows 11, 64-bit
+- SDR# revision 1921 with SDRSharp.exe, SDRSharp.dotnet8.exe, or
+  SDRSharp.dotnet9.exe
+
+Install
+-------
+1. Extract the entire ZIP file.
+2. Double-click Install-SDRNexus.cmd.
+3. If asked, select the folder that contains SDR#.
+4. On first install, sign in to DXNexus in the browser and approve the Bridge.
+5. Open SDR# and choose Radio tools > DXNexus.
+
+The installer includes its own .NET runtime for the Bridge. Administrator
+rights are not required. The plugin is installed in the plugin directory
+configured by SDR#, and the Bridge is installed only for the current user.
+
+Update
+------
+Run Install-SDRNexus.cmd from the new release. The installer closes SDR# only
+after asking, restarts the Bridge, and preserves credentials and offline data.
+
+Uninstall
+---------
+Close SDR#, then run uninstall.ps1 from:
+%LOCALAPPDATA%\Programs\SDRNexus Bridge
+
+Credentials and offline data in %LOCALAPPDATA%\DXNexus are preserved.
+
+Project: https://github.com/rapinoinfeliz/SDRNexus
+DXNexus: https://dxnexus.rapinoinfeliz.workers.dev/

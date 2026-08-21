@@ -4,8 +4,7 @@ SDRNexus is the Windows companion for DXNexus. It connects SDR# to the
 DXNexus station catalog, reception tools, wishlist, and logbook without
 placing network or authentication work inside the SDR# process.
 
-The project is currently being implemented incrementally. The accepted
-architecture is documented in
+The accepted architecture is documented in
 [`docs/adr/0001-plugin-bridge-architecture.md`](docs/adr/0001-plugin-bridge-architecture.md).
 
 The currently known production work that belongs in the main DXNexus
@@ -14,7 +13,7 @@ web/Worker repository is tracked in
 It contains reproduced failures, protocol requirements and end-to-end
 acceptance tests for the station catalog and browser tuning relay.
 
-## Planned components
+## Components
 
 ```text
 SDR#
@@ -30,11 +29,26 @@ SDR#
 
 ## Current status
 
-Architecture, protocol, a buildable Windows solution, the bidirectional local
+Architecture, protocol, the Windows solution, the bidirectional local
 named-pipe transport, secure browser-assisted device pairing, rotating DPoP
 credentials, exact-frequency station candidates, offline-safe explicit actions,
-and the optional live browser companion are implemented. Release artifacts are
-test packages until the real SDR#/Airspy compatibility gates are completed.
+and the optional live browser companion are implemented and tested with SDR#
+revision 1921 and an Airspy receiver on Windows.
+
+## Install on Windows
+
+1. Download `SDRNexus-0.1.0-windows-x64.zip` from the
+   [latest GitHub release](https://github.com/rapinoinfeliz/SDRNexus/releases/latest).
+2. Extract the entire ZIP file.
+3. Double-click **Install-SDRNexus.cmd**.
+4. If prompted, select the folder that contains SDR#.
+5. On first install, sign in to DXNexus and approve the Bridge in the browser.
+6. Open SDR# and choose **Radio tools → DXNexus**.
+
+Administrator rights and a separate .NET installation are not required. The
+installer recognizes classic SDR# plus the current .NET 8 and .NET 9 launchers,
+follows `core.pluginsDirectory` from `SDRSharp.config`, and preserves credentials
+and offline data during updates.
 
 ## Pairing the Bridge
 
@@ -73,8 +87,8 @@ official DXNexus application icon published by the web application.
 When the station catalog includes a logo, the Bridge downloads it with strict
 size limits, converts formats such as WebP to a small PNG, and sends it over the
 local pipe for display beside the station name in the SDR# candidate list.
-The responsive dark panel uses connection indicators, a frequency card and
-station cards with equal-width Target, Log and Stream actions. Authentication
+The responsive dark panel uses compact connection indicators and station cards
+with equal-width Target, Log and Stream actions. Authentication
 failures expose a local **Reconnect DXNexus** action; successful pairing reloads
 the credential in the running Bridge and retries station context immediately.
 
@@ -123,23 +137,19 @@ dotnet build SDRNexus.sln
 npm test
 ```
 
-## Windows test package
+## Windows package for contributors
 
 Every successful `.NET` workflow produces a 14-day `SDRNexus-windows-x64`
-artifact. Extract it, open PowerShell in the extracted directory, and run:
+artifact. Tagged versions are published permanently under GitHub Releases.
+Extract the package and double-click:
 
-```powershell
-.\install.ps1 -SdrSharpPath "C:\path\to\sdrsharp-x86"
+```text
+Install-SDRNexus.cmd
 ```
 
-The installer reads `core.pluginsDirectory` from `SDRSharp.config`, copies only
-the four SDRNexus plugin assemblies there, installs the per-user Bridge under
-`LocalAppData\Programs`, and optionally starts it with Windows. SDR# must be
-closed. Classic `SDRSharp.exe` and the current `SDRSharp.dotnet8.exe` and
-`SDRSharp.dotnet9.exe` launchers are recognized. The package contains SHA-256
-checksums and never redistributes SDR# or Airspy binaries. This remains a test
-package until the compatibility gates are completed on Windows with real SDR#
-hardware.
+PowerShell users may instead run `install.ps1 -SdrSharpPath "C:\path\to\SDR#"`.
+The package contains a self-contained Bridge, SHA-256 checksums, and never
+redistributes SDR# or Airspy binaries.
 
 ## Important boundaries
 

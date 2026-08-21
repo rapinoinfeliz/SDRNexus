@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Fetch pinned SDR# SDK reference assemblies
+        shell: bash
+        run: ./scripts/fetch-sdrsharp-sdk.sh
+      - run: dotnet restore SDRNexus.sln
+      - run: dotnet build SDRNexus.sln --configuration Release --no-restore
+      - run: dotnet test SDRNexus.sln --configuration Release --no-build --no-restore
+      - run: npm ci
+      - run: npm test
+      - name: Build self-contained Windows package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          ./scripts/package-release.ps1 -Configuration Release -Runtime win-x64 -Version $version
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $asset = "artifacts/SDRNexus-$version-windows-x64.zip"
+          $checksum = "$asset.sha256"
+          $notes = @"
+          ## Installation
+
+          1. Download **SDRNexus-$version-windows-x64.zip** below.
+          2. Extract the entire ZIP.
+          3. Double-click **Install-SDRNexus.cmd**.
+          4. Approve the DXNexus connection in the browser on first install.
+          5. Open SDR# and choose **Radio tools > DXNexus**.
+
+          No administrator rights or separate .NET runtime are required. This release targets Windows x64 and SDR# revision 1921.
+
+          SHA-256 checksums and complete installation instructions are included in the ZIP.
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          Set-Content $notesPath $notes -Encoding UTF8
+          gh release create $tag $asset $checksum --verify-tag --title "SDRNexus $tag" --notes-file $notesPath
