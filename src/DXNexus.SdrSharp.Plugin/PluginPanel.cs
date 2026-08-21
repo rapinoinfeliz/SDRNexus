@@ -10,78 +10,111 @@ internal sealed class PluginPanel : UserControl
     private readonly RadioStatePublisher _publisher;
     private readonly PipeRadioStateSink _sink;
     private readonly SpectrumOverlayController _spectrumOverlay;
+    private readonly StatusDot _bridgeStatusDot = new();
+    private readonly StatusDot _cloudStatusDot = new();
+    private readonly StatusDot _liveStatusDot = new();
     private readonly Label _statusLabel;
     private readonly Label _cloudStatusLabel;
     private readonly Label _liveStatusLabel;
-    private readonly Button _remoteTuneButton;
-    private readonly Label _frequencyLabel;
-    private readonly Label _modeLabel;
+    private readonly ModernButton _remoteTuneButton;
+    private readonly ModernButton _reconnectButton;
+    private readonly FrequencyDisplay _frequencyDisplay;
     private readonly Label _candidateStatusLabel;
     private readonly FlowLayoutPanel _candidateList;
-    private readonly Dictionary<string, PictureBox> _candidateLogos = new(StringComparer.Ordinal);
+    private readonly FlowLayoutPanel _content;
+    private readonly List<Control> _stretchControls = [];
+    private readonly Dictionary<string, LogoTarget> _candidateLogos = new(StringComparer.Ordinal);
     private SequencedRadioSnapshot _latestSnapshot;
     private long _candidateSequence = -1;
 
-    public PluginPanel(RadioStateCollector collector, RadioStatePublisher publisher, PipeRadioStateSink sink, SpectrumOverlayController spectrumOverlay)
+    public PluginPanel(
+        RadioStateCollector collector,
+        RadioStatePublisher publisher,
+        PipeRadioStateSink sink,
+        SpectrumOverlayController spectrumOverlay)
     {
         _collector = collector ?? throw new ArgumentNullException(nameof(collector));
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         _spectrumOverlay = spectrumOverlay ?? throw new ArgumentNullException(nameof(spectrumOverlay));
         _latestSnapshot = _collector.CaptureFullSnapshot();
+
         AutoScaleMode = AutoScaleMode.Dpi;
-        BackColor = Color.FromArgb(15, 31, 43);
-        ForeColor = Color.WhiteSmoke;
-        Padding = new Padding(12);
+        AutoScroll = true;
+        BackColor = DxnexusTheme.Background;
+        DoubleBuffered = true;
+        Font = DxnexusTheme.UiFont(9.5f);
+        ForeColor = DxnexusTheme.Text;
         MinimumSize = new Size(250, 260);
+        Padding = new Padding(15, 16, 15, 12);
 
         var title = new Label
         {
             AutoSize = true,
-            Font = new Font(Font, FontStyle.Bold),
+            BackColor = DxnexusTheme.Background,
+            Font = DxnexusTheme.UiFont(18, FontStyle.Bold),
+            ForeColor = DxnexusTheme.Text,
+            Margin = new Padding(0, 0, 0, 12),
             Text = "DXNexus",
         };
 
-        var spectrumOverlayToggle = new CheckBox
+        _statusLabel = StatusLabel("Bridge: checking…");
+        _cloudStatusLabel = StatusLabel("DXNexus cloud: checking…");
+        _liveStatusLabel = StatusLabel("Browser companion: checking…");
+        var statuses = new FlowLayoutPanel
         {
             AutoSize = true,
-            Checked = _spectrumOverlay.Enabled,
-            ForeColor = Color.FromArgb(155, 215, 255),
-            Margin = new Padding(0, 8, 0, 0),
-            Text = "Station labels on spectrum",
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = DxnexusTheme.Background,
+            FlowDirection = FlowDirection.TopDown,
+            Margin = new Padding(0),
+            WrapContents = false,
         };
-        spectrumOverlayToggle.CheckedChanged += (_, _) => _spectrumOverlay.Enabled = spectrumOverlayToggle.Checked;
+        statuses.Controls.Add(StatusRow(_bridgeStatusDot, _statusLabel));
+        statuses.Controls.Add(StatusRow(_cloudStatusDot, _cloudStatusLabel));
+        statuses.Controls.Add(StatusRow(_liveStatusDot, _liveStatusLabel));
 
-        _statusLabel = new Label
+        var separator = new Panel
         {
-            AutoSize = true,
-            ForeColor = Color.FromArgb(105, 210, 255),
-        };
-
-        _cloudStatusLabel = new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(320, 0),
-            ForeColor = Color.FromArgb(170, 185, 195),
-            Text = "DXNexus cloud: checking…",
-        };
-
-        _liveStatusLabel = new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(320, 0),
-            ForeColor = Color.FromArgb(170, 185, 195),
-            Text = "Browser companion: checking…",
+            BackColor = DxnexusTheme.Border,
+            Height = 1,
+            Margin = new Padding(0, 14, 0, 13),
         };
 
-        _remoteTuneButton = new Button
+        _reconnectButton = new ModernButton
         {
-            AutoSize = true,
-            FlatStyle = FlatStyle.Flat,
-            ForeColor = Color.FromArgb(155, 215, 255),
-            Margin = new Padding(0, 7, 0, 0),
-            Text = "Enable browser tuning (15 min)",
+            ForeColor = DxnexusTheme.Warning,
+            Margin = new Padding(0, 0, 0, 8),
+            Text = "↻  Reconnect DXNexus",
+            Visible = false,
         };
+        _reconnectButton.Click += async (_, _) =>
+        {
+            _reconnectButton.Enabled = false;
+            try
+            {
+                await _sink.RequestPairingAsync(_latestSnapshot.Sequence);
+            }
+            catch (Exception error)
+            {
+                _cloudStatusLabel.Text = $"Could not open reconnection: {error.Message}";
+                _cloudStatusLabel.ForeColor = DxnexusTheme.Error;
+                _cloudStatusDot.DotColor = DxnexusTheme.Error;
+            }
+            finally
+            {
+                _reconnectButton.Enabled = true;
+            }
+        };
+
+        _remoteTuneButton = new ModernButton
+        {
+            ForeColor = DxnexusTheme.Text,
+            Margin = new Padding(0, 0, 0, 14),
+            NormalColor = Color.FromArgb(28, 47, 59),
+            Text = "◉  Enable browser tuning (15 min)",
+        };
+        _remoteTuneButton.FlatAppearance.BorderColor = Color.FromArgb(53, 105, 135);
         _remoteTuneButton.Click += async (_, _) =>
         {
             _remoteTuneButton.Enabled = false;
@@ -92,7 +125,8 @@ internal sealed class PluginPanel : UserControl
             catch (Exception error)
             {
                 _liveStatusLabel.Text = $"Could not request browser tuning: {error.Message}";
-                _liveStatusLabel.ForeColor = Color.FromArgb(255, 140, 140);
+                _liveStatusLabel.ForeColor = DxnexusTheme.Error;
+                _liveStatusDot.DotColor = DxnexusTheme.Error;
             }
             finally
             {
@@ -100,55 +134,72 @@ internal sealed class PluginPanel : UserControl
             }
         };
 
-        _frequencyLabel = new Label
-        {
-            AutoSize = true,
-            Margin = new Padding(0, 18, 0, 0),
-        };
+        _frequencyDisplay = new FrequencyDisplay { Dock = DockStyle.Fill, Margin = new Padding(0) };
+        var frequencyCard = BuildFrequencyCard();
 
-        _modeLabel = new Label
+        var spectrumOverlayToggle = new CheckBox
         {
-            AutoSize = true,
-            ForeColor = Color.FromArgb(170, 185, 195),
+            AutoSize = false,
+            BackColor = DxnexusTheme.Background,
+            Checked = _spectrumOverlay.Enabled,
+            Font = DxnexusTheme.UiFont(10),
+            ForeColor = DxnexusTheme.Text,
+            Height = 28,
+            Margin = new Padding(0, 14, 0, 8),
+            Text = "Station labels on spectrum",
+            UseVisualStyleBackColor = false,
         };
+        spectrumOverlayToggle.CheckedChanged += (_, _) => _spectrumOverlay.Enabled = spectrumOverlayToggle.Checked;
 
         _candidateStatusLabel = new Label
         {
-            AutoSize = true,
-            MaximumSize = new Size(300, 0),
-            ForeColor = Color.FromArgb(170, 185, 195),
-            Margin = new Padding(0, 16, 0, 6),
-            Text = "Tune to a broadcast frequency to see candidates.",
+            AutoEllipsis = true,
+            BackColor = DxnexusTheme.Background,
+            Font = DxnexusTheme.UiFont(10),
+            ForeColor = DxnexusTheme.Muted,
+            Height = 30,
+            Margin = new Padding(0, 0, 0, 8),
+            Text = "◉  Tune to a broadcast frequency to see candidates.",
+            TextAlign = ContentAlignment.MiddleLeft,
         };
 
         _candidateList = new FlowLayoutPanel
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = DxnexusTheme.Background,
             FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
             Margin = new Padding(0),
+            WrapContents = false,
         };
 
-        var layout = new FlowLayoutPanel
+        var footer = BuildFooter();
+        _content = new FlowLayoutPanel
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = DxnexusTheme.Background,
             Dock = DockStyle.Top,
             FlowDirection = FlowDirection.TopDown,
+            Margin = new Padding(0),
             WrapContents = false,
         };
-        layout.Controls.Add(title);
-        layout.Controls.Add(_statusLabel);
-        layout.Controls.Add(_cloudStatusLabel);
-        layout.Controls.Add(_liveStatusLabel);
-        layout.Controls.Add(_remoteTuneButton);
-        layout.Controls.Add(_frequencyLabel);
-        layout.Controls.Add(_modeLabel);
-        layout.Controls.Add(spectrumOverlayToggle);
-        layout.Controls.Add(_candidateStatusLabel);
-        layout.Controls.Add(_candidateList);
-        Controls.Add(layout);
+        _content.Controls.Add(title);
+        _content.Controls.Add(statuses);
+        _content.Controls.Add(separator);
+        _content.Controls.Add(_reconnectButton);
+        _content.Controls.Add(_remoteTuneButton);
+        _content.Controls.Add(frequencyCard);
+        _content.Controls.Add(spectrumOverlayToggle);
+        _content.Controls.Add(_candidateStatusLabel);
+        _content.Controls.Add(_candidateList);
+        _content.Controls.Add(footer);
+        Controls.Add(_content);
+
+        _stretchControls.AddRange([
+            statuses, separator, _reconnectButton, _remoteTuneButton, frequencyCard,
+            spectrumOverlayToggle, _candidateStatusLabel, _candidateList, footer,
+        ]);
 
         _collector.SnapshotChanged += HandleSnapshotChanged;
         _publisher.ConnectionStateChanged += HandleConnectionStateChanged;
@@ -157,8 +208,107 @@ internal sealed class PluginPanel : UserControl
         _sink.ContextErrorReceived += HandleContextErrorReceived;
         _sink.BridgeStatusReceived += HandleBridgeStatusReceived;
         _sink.CommandCompleted += HandleCommandCompleted;
+        HandleCreated += (_, _) => UpdateResponsiveWidths();
         Render(_latestSnapshot);
         RenderConnectionState(_publisher.State);
+    }
+
+    protected override void OnResize(EventArgs eventArgs)
+    {
+        base.OnResize(eventArgs);
+        UpdateResponsiveWidths();
+    }
+
+    private RoundedPanel BuildFrequencyCard()
+    {
+        var card = new RoundedPanel
+        {
+            BorderColor = Color.FromArgb(52, 128, 168),
+            Height = 88,
+            Margin = new Padding(0),
+            Padding = new Padding(13, 10, 13, 10),
+        };
+        var layout = new TableLayoutPanel
+        {
+            BackColor = DxnexusTheme.Card,
+            ColumnCount = 2,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0),
+            RowCount = 1,
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 49));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.Controls.Add(new WaveformGlyph { Anchor = AnchorStyles.Left }, 0, 0);
+        layout.Controls.Add(_frequencyDisplay, 1, 0);
+        card.Controls.Add(layout);
+        return card;
+    }
+
+    private static Control BuildFooter()
+    {
+        var version = new Label
+        {
+            BackColor = DxnexusTheme.Background,
+            Dock = DockStyle.Fill,
+            Font = DxnexusTheme.UiFont(9),
+            ForeColor = DxnexusTheme.Muted,
+            Text = "☁  DXNexus v0.1.0",
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
+        var website = new LinkLabel
+        {
+            ActiveLinkColor = DxnexusTheme.Teal,
+            BackColor = DxnexusTheme.Background,
+            Dock = DockStyle.Fill,
+            Font = DxnexusTheme.UiFont(9),
+            LinkColor = DxnexusTheme.Accent,
+            Text = "dxnexus",
+            TextAlign = ContentAlignment.MiddleRight,
+            VisitedLinkColor = DxnexusTheme.Accent,
+        };
+        website.LinkClicked += (_, _) => Process.Start(new ProcessStartInfo("https://dxnexus.rapinoinfeliz.workers.dev/")
+        {
+            UseShellExecute = true,
+        });
+        var footer = new TableLayoutPanel
+        {
+            BackColor = DxnexusTheme.Background,
+            ColumnCount = 2,
+            Height = 38,
+            Margin = new Padding(0, 10, 0, 0),
+            RowCount = 1,
+        };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
+        footer.Controls.Add(version, 0, 0);
+        footer.Controls.Add(website, 1, 0);
+        return footer;
+    }
+
+    private static Label StatusLabel(string text) => new()
+    {
+        AutoSize = true,
+        BackColor = DxnexusTheme.Background,
+        Font = DxnexusTheme.UiFont(10),
+        ForeColor = DxnexusTheme.Muted,
+        Margin = new Padding(0),
+        Text = text,
+    };
+
+    private static Control StatusRow(StatusDot dot, Label label)
+    {
+        var row = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = DxnexusTheme.Background,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 0, 0, 4),
+            WrapContents = false,
+        };
+        row.Controls.Add(dot);
+        row.Controls.Add(label);
+        return row;
     }
 
     private void HandleCommandCompleted(object? sender, CommandResult result)
@@ -169,10 +319,8 @@ internal sealed class PluginPanel : UserControl
             BeginInvoke(() => HandleCommandCompleted(sender, result));
             return;
         }
-        _candidateStatusLabel.Text = result.Message;
-        _candidateStatusLabel.ForeColor = result.Success
-            ? Color.FromArgb(84, 226, 159)
-            : Color.FromArgb(255, 140, 140);
+        _candidateStatusLabel.Text = $"◉  {result.Message}";
+        _candidateStatusLabel.ForeColor = result.Success ? DxnexusTheme.Success : DxnexusTheme.Error;
     }
 
     private void HandleContextErrorReceived(object? sender, BridgeError error)
@@ -185,11 +333,9 @@ internal sealed class PluginPanel : UserControl
         }
         ClearCandidates();
         _candidateStatusLabel.Text = error.Code == "catalog-unavailable"
-            ? "The DXNexus station catalog is temporarily unavailable. Retrying automatically…"
-            : error.Message;
-        _candidateStatusLabel.ForeColor = error.Transient
-            ? Color.FromArgb(255, 196, 96)
-            : Color.FromArgb(255, 140, 140);
+            ? "◉  The station catalog is temporarily unavailable. Retrying…"
+            : $"◉  {error.Message}";
+        _candidateStatusLabel.ForeColor = error.Transient ? DxnexusTheme.Warning : DxnexusTheme.Error;
     }
 
     private void HandleBridgeStatusReceived(object? sender, BridgeServiceStatus status)
@@ -208,32 +354,52 @@ internal sealed class PluginPanel : UserControl
             "action-required" => status.Message,
             _ => "DXNexus cloud: checking…",
         };
-        _cloudStatusLabel.ForeColor = status.CloudState == "connected"
-            ? Color.FromArgb(84, 226, 159)
-            : status.CloudState == "degraded"
-                ? Color.FromArgb(255, 196, 96)
-                : Color.FromArgb(170, 185, 195);
+        _cloudStatusLabel.ForeColor = status.CloudState switch
+        {
+            "connected" => DxnexusTheme.Text,
+            "degraded" => DxnexusTheme.Warning,
+            "action-required" => DxnexusTheme.Error,
+            _ => DxnexusTheme.Muted,
+        };
+        _cloudStatusDot.DotColor = status.CloudState switch
+        {
+            "connected" => DxnexusTheme.Success,
+            "degraded" => DxnexusTheme.Warning,
+            "action-required" => DxnexusTheme.Error,
+            _ => DxnexusTheme.Muted,
+        };
 
         _liveStatusLabel.Text = !status.LiveEnabled
-            ? "Browser companion disabled in the Bridge"
+            ? "Browser companion disabled"
             : status.LiveConnected
                 ? "Live browser connected"
                 : "Live browser reconnecting…";
         _liveStatusLabel.ForeColor = status.LiveConnected
-            ? Color.FromArgb(84, 226, 159)
-            : Color.FromArgb(255, 196, 96);
+            ? DxnexusTheme.Text
+            : status.LiveEnabled ? DxnexusTheme.Warning : DxnexusTheme.Muted;
+        _liveStatusDot.DotColor = status.LiveConnected
+            ? DxnexusTheme.Success
+            : status.LiveEnabled ? DxnexusTheme.Warning : DxnexusTheme.Muted;
+
+        var authenticationText = $"{status.Code} {status.Message}";
+        _reconnectButton.Visible = !status.Paired
+            || status.CloudState == "action-required" &&
+            (authenticationText.Contains("credential", StringComparison.OrdinalIgnoreCase)
+             || authenticationText.Contains("token", StringComparison.OrdinalIgnoreCase)
+             || authenticationText.Contains("pair", StringComparison.OrdinalIgnoreCase));
 
         if (status.RemoteTuningUntil is { } until && until > DateTimeOffset.UtcNow)
         {
             var minutes = Math.Max(1, (int)Math.Ceiling((until - DateTimeOffset.UtcNow).TotalMinutes));
-            _remoteTuneButton.Text = $"Browser tuning enabled ({minutes} min)";
-            _remoteTuneButton.ForeColor = Color.FromArgb(84, 226, 159);
+            _remoteTuneButton.Text = $"●  Browser tuning enabled ({minutes} min)";
+            _remoteTuneButton.ForeColor = DxnexusTheme.Success;
         }
         else
         {
-            _remoteTuneButton.Text = "Enable browser tuning (15 min)";
-            _remoteTuneButton.ForeColor = Color.FromArgb(155, 215, 255);
+            _remoteTuneButton.Text = "◉  Enable browser tuning (15 min)";
+            _remoteTuneButton.ForeColor = DxnexusTheme.Text;
         }
+        UpdateResponsiveWidths();
     }
 
     private void HandleCandidatesReceived(object? sender, CandidateContextResponse response)
@@ -253,130 +419,219 @@ internal sealed class PluginPanel : UserControl
         ClearCandidates();
         _candidateSequence = response.Sequence;
         _candidateStatusLabel.Text = response.Candidates.Length == 0
-            ? "No catalog candidate on this exact frequency."
-            : $"{response.Candidates.Length} candidate{(response.Candidates.Length == 1 ? "" : "s")} · {response.Band}";
-        _candidateStatusLabel.ForeColor = Color.FromArgb(170, 185, 195);
+            ? "◉  No catalog candidate on this exact frequency."
+            : $"♟  {response.Candidates.Length} candidate{(response.Candidates.Length == 1 ? "" : "s")}  ·  {response.Band}";
+        _candidateStatusLabel.ForeColor = DxnexusTheme.Muted;
         foreach (var candidate in response.Candidates.Take(6))
-        {
-            var received = candidate.Received.AtListeningPoint ? " · heard here" : candidate.Wishlisted ? " · target" : "";
-            var field = candidate.Estimate.FieldStrengthDbuvM is double value ? $" · {value:0} dBµV/m" : "";
-            var hasLogo = !string.IsNullOrWhiteSpace(candidate.LogoUrl);
-            var info = new Label
-            {
-                AutoSize = true,
-                MaximumSize = new Size(hasLogo ? 250 : 300, 0),
-                Margin = new Padding(0),
-                Text = $"{candidate.StationName}\n{candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}{field}{received}",
-                ForeColor = candidate.Received.AtListeningPoint
-                    ? Color.FromArgb(84, 226, 159)
-                    : Color.WhiteSmoke,
-            };
-            var heading = new FlowLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                FlowDirection = FlowDirection.LeftToRight,
-                Margin = new Padding(0),
-                WrapContents = false,
-            };
-            if (hasLogo)
-            {
-                var logo = new PictureBox
-                {
-                    Margin = new Padding(0, 0, 8, 0),
-                    Size = new Size(40, 40),
-                    SizeMode = PictureBoxSizeMode.Zoom,
-                    Visible = false,
-                };
-                _candidateLogos[CandidateKey(candidate.BroadcastId, candidate.SiteId)] = logo;
-                heading.Controls.Add(logo);
-            }
-            heading.Controls.Add(info);
-            var target = new Button
-            {
-                AutoSize = true,
-                FlatStyle = FlatStyle.Flat,
-                Text = candidate.Wishlisted ? "Remove target" : "Target",
-                ForeColor = candidate.Wishlisted ? Color.FromArgb(255, 150, 170) : Color.FromArgb(155, 215, 255),
-                Tag = candidate.Wishlisted,
-            };
-            target.Click += async (_, _) =>
-            {
-                try
-                {
-                    var next = !(target.Tag is true);
-                    target.Enabled = false;
-                    await _sink.SetWishlistAsync(candidate, next, _latestSnapshot.Sequence);
-                    target.Tag = next;
-                    target.Text = next ? "Remove target" : "Target";
-                    target.Enabled = true;
-                }
-                catch (Exception error)
-                {
-                    target.Enabled = true;
-                    _candidateStatusLabel.Text = $"Target update failed: {error.Message}";
-                }
-            };
-            var log = new Button { AutoSize = true, FlatStyle = FlatStyle.Flat, Text = "Log", ForeColor = Color.FromArgb(155, 215, 255) };
-            log.Click += async (_, _) =>
-            {
-                using var form = new QuickLogForm(candidate);
-                if (form.ShowDialog(this) != DialogResult.OK) return;
-                log.Enabled = false;
-                try
-                {
-                    await _sink.LogAsync(new QuickLogCommand(
-                        Guid.CreateVersion7(), candidate, form.SignalQuality, form.IdentificationStatus,
-                        form.IdentificationMethods, form.Notes, null, _latestSnapshot), _latestSnapshot.Sequence);
-                }
-                catch (Exception error)
-                {
-                    _candidateStatusLabel.Text = $"Log failed: {error.Message}";
-                }
-                finally { log.Enabled = true; }
-            };
-            var stream = new Button
-            {
-                AutoSize = true,
-                FlatStyle = FlatStyle.Flat,
-                Text = "Stream",
-                ForeColor = Color.FromArgb(155, 215, 255),
-            };
-            stream.Click += (_, _) =>
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo(StationStreamSearch.BuildGoogleUri(candidate).AbsoluteUri)
-                    {
-                        UseShellExecute = true,
-                    });
-                    _candidateStatusLabel.Text = $"Opening stream search for {candidate.StationName}…";
-                    _candidateStatusLabel.ForeColor = Color.FromArgb(84, 226, 159);
-                }
-                catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
-                {
-                    _candidateStatusLabel.Text = $"Could not open stream search: {error.Message}";
-                    _candidateStatusLabel.ForeColor = Color.FromArgb(255, 140, 140);
-                }
-            };
-            var actions = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 3, 0, 0) };
-            actions.Controls.Add(target);
-            actions.Controls.Add(log);
-            actions.Controls.Add(stream);
-            var row = new FlowLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                Margin = new Padding(0, 0, 0, 9),
-            };
-            row.Controls.Add(heading);
-            row.Controls.Add(actions);
-            _candidateList.Controls.Add(row);
-        }
+            _candidateList.Controls.Add(BuildCandidateCard(candidate));
         _candidateList.ResumeLayout();
+        UpdateResponsiveWidths();
     }
+
+    private RoundedPanel BuildCandidateCard(StationCandidate candidate)
+    {
+        var card = new RoundedPanel
+        {
+            BorderColor = candidate.Received.AtListeningPoint
+                ? Color.FromArgb(55, 126, 91)
+                : candidate.Wishlisted ? Color.FromArgb(117, 69, 87) : DxnexusTheme.Border,
+            Height = 148,
+            Margin = new Padding(0, 0, 0, 11),
+            Padding = new Padding(12),
+        };
+        var root = new TableLayoutPanel
+        {
+            BackColor = DxnexusTheme.Card,
+            ColumnCount = 1,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0),
+            RowCount = 2,
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+
+        var heading = new TableLayoutPanel
+        {
+            BackColor = DxnexusTheme.Card,
+            ColumnCount = 3,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0),
+            RowCount = 1,
+        };
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 62));
+
+        var logoHost = new Panel { BackColor = DxnexusTheme.Card, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        var placeholder = new Label
+        {
+            BackColor = DxnexusTheme.Card,
+            Dock = DockStyle.Fill,
+            Font = DxnexusTheme.UiFont(19, FontStyle.Bold),
+            ForeColor = candidate.Received.AtListeningPoint ? DxnexusTheme.Success : DxnexusTheme.Teal,
+            Text = "◉",
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+        var logo = new PictureBox
+        {
+            BackColor = DxnexusTheme.Card,
+            Dock = DockStyle.Fill,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Visible = false,
+        };
+        logoHost.Controls.Add(placeholder);
+        logoHost.Controls.Add(logo);
+        if (!string.IsNullOrWhiteSpace(candidate.LogoUrl))
+            _candidateLogos[CandidateKey(candidate.BroadcastId, candidate.SiteId)] = new LogoTarget(logo, placeholder);
+
+        var text = new TableLayoutPanel
+        {
+            BackColor = DxnexusTheme.Card,
+            ColumnCount = 1,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(9, 0, 7, 0),
+            RowCount = 2,
+        };
+        text.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
+        text.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
+        var name = new Label
+        {
+            AutoEllipsis = true,
+            BackColor = DxnexusTheme.Card,
+            Dock = DockStyle.Fill,
+            Font = DxnexusTheme.UiFont(10.2f, FontStyle.Bold),
+            ForeColor = DxnexusTheme.Text,
+            Margin = new Padding(0),
+            Text = candidate.StationName,
+            TextAlign = ContentAlignment.BottomLeft,
+        };
+        var received = candidate.Received.AtListeningPoint ? " · heard here" : candidate.Wishlisted ? " · target" : "";
+        var details = new Label
+        {
+            AutoEllipsis = true,
+            BackColor = DxnexusTheme.Card,
+            Dock = DockStyle.Fill,
+            Font = DxnexusTheme.UiFont(9),
+            ForeColor = DxnexusTheme.Muted,
+            Margin = new Padding(0),
+            Text = $"{candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}{received}",
+            TextAlign = ContentAlignment.TopLeft,
+        };
+        text.Controls.Add(name, 0, 0);
+        text.Controls.Add(details, 0, 1);
+
+        var field = new Label
+        {
+            BackColor = DxnexusTheme.Card,
+            Dock = DockStyle.Fill,
+            Font = DxnexusTheme.UiFont(9),
+            ForeColor = DxnexusTheme.Accent,
+            Margin = new Padding(0),
+            Text = candidate.Estimate.FieldStrengthDbuvM is double value ? $"{value:0}\ndBµV/m" : "",
+            TextAlign = ContentAlignment.MiddleRight,
+        };
+        heading.Controls.Add(logoHost, 0, 0);
+        heading.Controls.Add(text, 1, 0);
+        heading.Controls.Add(field, 2, 0);
+
+        var target = ActionButton(candidate.Wishlisted ? "● Remove" : "◎ Target");
+        target.ForeColor = candidate.Wishlisted ? DxnexusTheme.Target : DxnexusTheme.Accent;
+        target.Tag = candidate.Wishlisted;
+        target.Click += async (_, _) =>
+        {
+            try
+            {
+                var next = !(target.Tag is true);
+                target.Enabled = false;
+                await _sink.SetWishlistAsync(candidate, next, _latestSnapshot.Sequence);
+                target.Tag = next;
+                target.Text = next ? "● Remove" : "◎ Target";
+                target.ForeColor = next ? DxnexusTheme.Target : DxnexusTheme.Accent;
+            }
+            catch (Exception error)
+            {
+                _candidateStatusLabel.Text = $"◉  Target update failed: {error.Message}";
+                _candidateStatusLabel.ForeColor = DxnexusTheme.Error;
+            }
+            finally
+            {
+                target.Enabled = true;
+            }
+        };
+
+        var log = ActionButton("▤ Log");
+        log.Click += async (_, _) =>
+        {
+            using var form = new QuickLogForm(candidate);
+            if (form.ShowDialog(this) != DialogResult.OK) return;
+            log.Enabled = false;
+            try
+            {
+                await _sink.LogAsync(new QuickLogCommand(
+                    Guid.CreateVersion7(), candidate, form.SignalQuality, form.IdentificationStatus,
+                    form.IdentificationMethods, form.Notes, null, _latestSnapshot), _latestSnapshot.Sequence);
+            }
+            catch (Exception error)
+            {
+                _candidateStatusLabel.Text = $"◉  Log failed: {error.Message}";
+                _candidateStatusLabel.ForeColor = DxnexusTheme.Error;
+            }
+            finally
+            {
+                log.Enabled = true;
+            }
+        };
+
+        var stream = ActionButton("▶ Stream");
+        stream.Click += (_, _) =>
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(StationStreamSearch.BuildGoogleUri(candidate).AbsoluteUri)
+                {
+                    UseShellExecute = true,
+                });
+                _candidateStatusLabel.Text = $"◉  Opening stream search for {candidate.StationName}…";
+                _candidateStatusLabel.ForeColor = DxnexusTheme.Success;
+            }
+            catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                _candidateStatusLabel.Text = $"◉  Could not open stream search: {error.Message}";
+                _candidateStatusLabel.ForeColor = DxnexusTheme.Error;
+            }
+        };
+
+        var actions = new TableLayoutPanel
+        {
+            BackColor = DxnexusTheme.Card,
+            ColumnCount = 3,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 4, 0, 0),
+            RowCount = 1,
+        };
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334f));
+        target.Margin = new Padding(0, 0, 4, 0);
+        log.Margin = new Padding(2, 0, 2, 0);
+        stream.Margin = new Padding(4, 0, 0, 0);
+        actions.Controls.Add(target, 0, 0);
+        actions.Controls.Add(log, 1, 0);
+        actions.Controls.Add(stream, 2, 0);
+
+        root.Controls.Add(heading, 0, 0);
+        root.Controls.Add(actions, 0, 1);
+        card.Controls.Add(root);
+        return card;
+    }
+
+    private static ModernButton ActionButton(string text) => new()
+    {
+        Dock = DockStyle.Fill,
+        Font = DxnexusTheme.UiFont(9),
+        ForeColor = DxnexusTheme.Accent,
+        Text = text,
+    };
 
     private void HandleStationLogoReceived(object? sender, StationLogoImage logo)
     {
@@ -387,52 +642,47 @@ internal sealed class PluginPanel : UserControl
             return;
         }
         if (logo.Sequence != _candidateSequence
-            || !_candidateLogos.TryGetValue(CandidateKey(logo.BroadcastId, logo.SiteId), out var picture)) return;
+            || !_candidateLogos.TryGetValue(CandidateKey(logo.BroadcastId, logo.SiteId), out var target)) return;
 
         try
         {
             using var stream = new MemoryStream(logo.PngBytes, writable: false);
             using var source = Image.FromStream(stream);
             var rendered = new Bitmap(source);
-            var previous = picture.Image;
-            picture.Image = rendered;
-            picture.Visible = true;
+            var previous = target.Picture.Image;
+            target.Picture.Image = rendered;
+            target.Picture.Visible = true;
+            target.Picture.BringToFront();
+            target.Placeholder.Visible = false;
             previous?.Dispose();
         }
         catch (ArgumentException)
         {
-            // The station row remains usable when a malformed image is received.
+            // The fallback broadcast glyph remains visible for malformed images.
         }
     }
 
     private void ClearCandidates()
     {
-        foreach (var picture in _candidateLogos.Values)
+        foreach (var target in _candidateLogos.Values)
         {
-            picture.Image?.Dispose();
-            picture.Image = null;
+            target.Picture.Image?.Dispose();
+            target.Picture.Image = null;
         }
         _candidateLogos.Clear();
-        foreach (Control row in _candidateList.Controls.Cast<Control>().ToArray()) row.Dispose();
+        foreach (Control card in _candidateList.Controls.Cast<Control>().ToArray()) card.Dispose();
         _candidateList.Controls.Clear();
         _candidateSequence = -1;
     }
 
-    private static string CandidateKey(string broadcastId, string siteId) => $"{broadcastId}\n{siteId}";
-
     private void HandleConnectionStateChanged(object? sender, BridgeConnectionState state)
     {
-        if (IsDisposed)
-        {
-            return;
-        }
-
+        if (IsDisposed) return;
         if (InvokeRequired)
         {
             BeginInvoke(() => RenderConnectionState(state));
             return;
         }
-
         RenderConnectionState(state);
     }
 
@@ -441,27 +691,25 @@ internal sealed class PluginPanel : UserControl
         _statusLabel.Text = state switch
         {
             BridgeConnectionState.Connected => "Bridge connected",
-            BridgeConnectionState.Connecting => "Connecting to Bridge...",
+            BridgeConnectionState.Connecting => "Connecting to Bridge…",
             _ => "Bridge offline",
         };
         _statusLabel.ForeColor = state == BridgeConnectionState.Connected
-            ? Color.FromArgb(84, 226, 159)
-            : Color.FromArgb(105, 210, 255);
+            ? DxnexusTheme.Text
+            : state == BridgeConnectionState.Connecting ? DxnexusTheme.Warning : DxnexusTheme.Error;
+        _bridgeStatusDot.DotColor = state == BridgeConnectionState.Connected
+            ? DxnexusTheme.Success
+            : state == BridgeConnectionState.Connecting ? DxnexusTheme.Warning : DxnexusTheme.Error;
     }
 
     private void HandleSnapshotChanged(object? sender, SequencedRadioSnapshot snapshot)
     {
-        if (IsDisposed)
-        {
-            return;
-        }
-
+        if (IsDisposed) return;
         if (InvokeRequired)
         {
             BeginInvoke(() => Render(snapshot));
             return;
         }
-
         Render(snapshot);
     }
 
@@ -469,21 +717,34 @@ internal sealed class PluginPanel : UserControl
     {
         if (_latestSnapshot is not null && _latestSnapshot.Radio.FrequencyHz != snapshot.Radio.FrequencyHz)
         {
-            _candidateStatusLabel.Text = "Loading station candidates…";
-            _candidateStatusLabel.ForeColor = Color.FromArgb(170, 185, 195);
+            _candidateStatusLabel.Text = "◉  Loading station candidates…";
+            _candidateStatusLabel.ForeColor = DxnexusTheme.Muted;
             ClearCandidates();
         }
         _latestSnapshot = snapshot;
-        _frequencyLabel.Text = FormatFrequency(snapshot.Radio.FrequencyHz);
-        _modeLabel.Text = $"{snapshot.Radio.Detector.ToString().ToUpperInvariant()} · {snapshot.Radio.FilterBandwidthHz / 1_000d:0.#} kHz";
+        _frequencyDisplay.SetValues(
+            FormatFrequency(snapshot.Radio.FrequencyHz),
+            $"{snapshot.Radio.Detector.ToString().ToUpperInvariant()}   ·   {snapshot.Radio.FilterBandwidthHz / 1_000d:0.#} kHz");
     }
 
-    private static string FormatFrequency(long frequencyHz)
+    private void UpdateResponsiveWidths()
     {
-        return frequencyHz >= 1_000_000
-            ? $"{frequencyHz / 1_000_000d:0.000} MHz"
-            : $"{frequencyHz / 1_000d:0.0} kHz";
+        if (_content is null || ClientSize.Width <= 0) return;
+        var scrollbar = VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0;
+        var width = Math.Max(210, ClientSize.Width - Padding.Horizontal - scrollbar - 1);
+        _content.Width = width;
+        foreach (var control in _stretchControls) control.Width = width;
+        foreach (Control card in _candidateList.Controls) card.Width = width;
+        _statusLabel.MaximumSize = new Size(Math.Max(160, width - 28), 0);
+        _cloudStatusLabel.MaximumSize = new Size(Math.Max(160, width - 28), 0);
+        _liveStatusLabel.MaximumSize = new Size(Math.Max(160, width - 28), 0);
     }
+
+    private static string CandidateKey(string broadcastId, string siteId) => $"{broadcastId}\n{siteId}";
+
+    private static string FormatFrequency(long frequencyHz) => frequencyHz >= 1_000_000
+        ? $"{frequencyHz / 1_000_000d:0.000} MHz"
+        : $"{frequencyHz / 1_000d:0.0} kHz";
 
     protected override void Dispose(bool disposing)
     {
@@ -498,7 +759,8 @@ internal sealed class PluginPanel : UserControl
             _sink.CommandCompleted -= HandleCommandCompleted;
             ClearCandidates();
         }
-
         base.Dispose(disposing);
     }
+
+    private sealed record LogoTarget(PictureBox Picture, Label Placeholder);
 }

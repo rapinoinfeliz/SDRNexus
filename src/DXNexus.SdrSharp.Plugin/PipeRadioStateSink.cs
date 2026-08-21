@@ -71,5 +71,11 @@ internal sealed class PipeRadioStateSink : IRadioStateSink
             sequence,
             new RemoteTuningAuthorizationRequest(Guid.CreateVersion7()),
             cancellationToken);
+    public Task RequestPairingAsync(long sequence, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(
+            "command.pairing.request",
+            sequence,
+            new PairingUiRequest(Guid.CreateVersion7()),
+            cancellationToken);
     public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

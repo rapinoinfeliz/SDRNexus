@@ -3,7 +3,15 @@ using System.Text.Json;
 
 namespace DXNexus.Bridge.Core;
 
-public sealed class DeviceCredentialStore(string? filePath = null)
+public interface IDeviceCredentialStore
+{
+    bool Exists { get; }
+    Task SaveAsync(DeviceCredential credential, CancellationToken cancellationToken = default);
+    Task<DeviceCredential?> LoadAsync(CancellationToken cancellationToken = default);
+    void Delete();
+}
+
+public sealed class DeviceCredentialStore(string? filePath = null) : IDeviceCredentialStore
 {
     private static readonly byte[] Entropy = "DXNexus.SDRNexus.DeviceCredential.v1"u8.ToArray();
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

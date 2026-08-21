@@ -73,6 +73,10 @@ official DXNexus application icon published by the web application.
 When the station catalog includes a logo, the Bridge downloads it with strict
 size limits, converts formats such as WebP to a small PNG, and sends it over the
 local pipe for display beside the station name in the SDR# candidate list.
+The responsive dark panel uses connection indicators, a frequency card and
+station cards with equal-width Target, Log and Stream actions. Authentication
+failures expose a local **Reconnect DXNexus** action; successful pairing reloads
+the credential in the running Bridge and retries station context immediately.
 
 Browser tuning remains independently locked. It is available only after the
 user selects **Allow browser tuning for 15 minutes…** in the local Bridge tray,

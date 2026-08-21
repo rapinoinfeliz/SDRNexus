@@ -190,10 +190,32 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         }
     }
 
-    private static void ShowPairing()
+    private void ShowPairing()
     {
         using var form = new PairingForm();
-        form.ShowDialog();
+        if (form.ShowDialog() == DialogResult.OK) _ = CompletePairingAsync();
+    }
+
+    private async Task CompletePairingAsync()
+    {
+        try
+        {
+            await _apiClient.ReloadCredentialAsync().ConfigureAwait(false);
+            _cloudState = "checking";
+            _statusCode = null;
+            _statusMessage = "DXNexus reconnected. Refreshing station context…";
+            _candidateQueryKey = null;
+            _latestCandidateContext = null;
+            if (_latestRadioSnapshot is { } snapshot) await RefreshCandidatesAsync(snapshot).ConfigureAwait(false);
+            else await PublishBridgeStatusAsync().ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            _cloudState = "action-required";
+            _statusCode = "pairing-reload-failed";
+            _statusMessage = $"DXNexus reconnected, but the new credential could not be loaded: {error.Message}";
+            await PublishBridgeStatusAsync().ConfigureAwait(false);
+        }
     }
 
     private void ShowReceptionSetup()
@@ -228,6 +250,11 @@ internal sealed class BridgeApplicationContext : ApplicationContext
         if (message.Type == "command.remote-tune.request")
         {
             _uiContext.Post(_ => EnableRemoteTuning(), null);
+            return;
+        }
+        if (message.Type == "command.pairing.request")
+        {
+            _uiContext.Post(_ => ShowPairing(), null);
             return;
         }
         if (message.Type == "command.wishlist")

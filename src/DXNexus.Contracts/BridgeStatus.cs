@@ -17,3 +17,4 @@ public sealed record BridgeServiceStatus(
     string Message);
 
 public sealed record RemoteTuningAuthorizationRequest(Guid RequestId);
+public sealed record PairingUiRequest(Guid RequestId);

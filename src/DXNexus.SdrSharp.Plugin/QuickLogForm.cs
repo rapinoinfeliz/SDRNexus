@@ -4,10 +4,26 @@ namespace DXNexus.SdrSharp.Plugin;
 
 internal sealed class QuickLogForm : Form
 {
-    private readonly ComboBox _quality = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 210 };
-    private readonly ComboBox _identification = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 210 };
-    private readonly CheckedListBox _methods = new() { Height = 82, Width = 260, CheckOnClick = true };
-    private readonly TextBox _notes = new() { Multiline = true, Width = 310, Height = 55 };
+    private readonly ComboBox _quality = InputCombo();
+    private readonly ComboBox _identification = InputCombo();
+    private readonly CheckedListBox _methods = new()
+    {
+        BackColor = DxnexusTheme.CardRaised,
+        BorderStyle = BorderStyle.FixedSingle,
+        CheckOnClick = true,
+        ForeColor = DxnexusTheme.Text,
+        Height = 96,
+        Width = 330,
+    };
+    private readonly TextBox _notes = new()
+    {
+        BackColor = DxnexusTheme.CardRaised,
+        BorderStyle = BorderStyle.FixedSingle,
+        ForeColor = DxnexusTheme.Text,
+        Multiline = true,
+        Width = 330,
+        Height = 66,
+    };
 
     public QuickLogForm(StationCandidate candidate)
     {
@@ -18,7 +34,10 @@ internal sealed class QuickLogForm : Form
         MinimizeBox = false;
         ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(390, 480);
+        BackColor = DxnexusTheme.Background;
+        ClientSize = new Size(410, 510);
+        Font = DxnexusTheme.UiFont(9.5f);
+        ForeColor = DxnexusTheme.Text;
         _quality.Items.AddRange(["Barely audible", "Poor", "Fair", "Good", "Excellent"]);
         _quality.SelectedItem = "Good";
         _identification.Items.AddRange(["Confirmed", "Probable", "Tentative", "Unidentified"]);
@@ -26,15 +45,31 @@ internal sealed class QuickLogForm : Form
         _methods.Items.AddRange(["Station ID", "RDS PI", "RDS PS", "RDS RT", "Official stream", "Program content", "Schedule", "Other"]);
         _methods.SetItemChecked(0, true);
 
-        var title = new Label { AutoSize = true, Font = new Font(Font, FontStyle.Bold), Text = candidate.StationName };
+        var title = new Label
+        {
+            AutoSize = true,
+            BackColor = DxnexusTheme.Background,
+            Font = DxnexusTheme.UiFont(15, FontStyle.Bold),
+            ForeColor = DxnexusTheme.Text,
+            Text = candidate.StationName,
+        };
         var context = new Label
         {
             AutoSize = true,
-            ForeColor = SystemColors.GrayText,
+            BackColor = DxnexusTheme.Background,
+            ForeColor = DxnexusTheme.Muted,
             Text = $"{FormatFrequency(candidate.FrequencyHz)} · {candidate.DistanceKm:0.#} km · {candidate.BearingDeg:0}° {candidate.BearingCardinal}",
         };
-        var save = new Button { Text = "Save reception", AutoSize = true, DialogResult = DialogResult.OK };
-        var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        var save = new ModernButton
+        {
+            DialogResult = DialogResult.OK,
+            ForeColor = DxnexusTheme.Text,
+            NormalColor = Color.FromArgb(28, 64, 82),
+            Text = "▤  Save reception",
+            Width = 150,
+        };
+        save.FlatAppearance.BorderColor = DxnexusTheme.Accent;
+        var cancel = new ModernButton { DialogResult = DialogResult.Cancel, Text = "Cancel", Width = 90 };
         AcceptButton = save;
         CancelButton = cancel;
 
@@ -42,6 +77,7 @@ internal sealed class QuickLogForm : Form
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = DxnexusTheme.Background,
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             Padding = new Padding(20, 8, 20, 20),
@@ -53,6 +89,7 @@ internal sealed class QuickLogForm : Form
         var layout = new FlowLayoutPanel
         {
             AutoScroll = true,
+            BackColor = DxnexusTheme.Background,
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
             Padding = new Padding(20, 20, 20, 0),
@@ -72,6 +109,7 @@ internal sealed class QuickLogForm : Form
         var root = new TableLayoutPanel
         {
             ColumnCount = 1,
+            BackColor = DxnexusTheme.Background,
             Dock = DockStyle.Fill,
             RowCount = 2,
         };
@@ -88,7 +126,23 @@ internal sealed class QuickLogForm : Form
     public string[] IdentificationMethods => _methods.CheckedItems.Cast<string>().Select(Slug).ToArray();
     public string? Notes => string.IsNullOrWhiteSpace(_notes.Text) ? null : _notes.Text.Trim();
 
-    private static Label FieldLabel(string text) => new() { Text = text, AutoSize = true, Margin = new Padding(0, 12, 0, 2) };
+    private static ComboBox InputCombo() => new()
+    {
+        BackColor = DxnexusTheme.CardRaised,
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        FlatStyle = FlatStyle.Flat,
+        ForeColor = DxnexusTheme.Text,
+        Width = 250,
+    };
+
+    private static Label FieldLabel(string text) => new()
+    {
+        AutoSize = true,
+        BackColor = DxnexusTheme.Background,
+        ForeColor = DxnexusTheme.Muted,
+        Margin = new Padding(0, 12, 0, 2),
+        Text = text,
+    };
     private static string Slug(string value) => value.Trim().ToLowerInvariant().Replace(' ', '-');
     private static string FormatFrequency(long frequencyHz) => frequencyHz >= 1_000_000
         ? $"{frequencyHz / 1_000_000d:0.000} MHz"

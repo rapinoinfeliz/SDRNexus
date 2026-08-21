@@ -47,8 +47,8 @@ internal sealed class PairingForm : Form
         _openBrowser.AutoSize = true;
         _openBrowser.Enabled = false;
         _openBrowser.Click += (_, _) => OpenVerificationPage();
-        var cancel = new Button { Text = "Cancel", AutoSize = true };
-        cancel.Click += (_, _) => Close();
+        var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        CancelButton = cancel;
 
         var buttons = new FlowLayoutPanel
         {
@@ -101,6 +101,7 @@ internal sealed class PairingForm : Form
                     _status.ForeColor = Color.SeaGreen;
                     _openBrowser.Text = "Connected";
                     _openBrowser.Enabled = false;
+                    DialogResult = DialogResult.OK;
                     return;
                 }
                 catch (PairingPendingException pending)

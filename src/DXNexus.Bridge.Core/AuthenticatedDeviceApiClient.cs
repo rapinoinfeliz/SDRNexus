@@ -11,11 +11,11 @@ namespace DXNexus.Bridge.Core;
 
 public sealed class AuthenticatedDeviceApiClient(
     HttpClient httpClient,
-    DeviceCredentialStore credentialStore) : IDisposable
+    IDeviceCredentialStore credentialStore) : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient = httpClient;
-    private readonly DeviceCredentialStore _credentialStore = credentialStore;
+    private readonly IDeviceCredentialStore _credentialStore = credentialStore;
     private readonly SemaphoreSlim _credentialGate = new(1, 1);
     private DeviceCredential? _credential;
 
@@ -159,6 +159,24 @@ public sealed class AuthenticatedDeviceApiClient(
         _credential = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("This Bridge is not paired with DXNexus.");
         return _credential;
+    }
+
+    public async Task ReloadCredentialAsync(CancellationToken cancellationToken = default)
+    {
+        await _credentialGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var reloaded = await _credentialStore.LoadAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("This Bridge is not paired with DXNexus.");
+            var previous = _credential;
+            _credential = reloaded;
+            if (previous is not null && !ReferenceEquals(previous, reloaded))
+                CryptographicOperations.ZeroMemory(previous.PrivateKeyPkcs8);
+        }
+        finally
+        {
+            _credentialGate.Release();
+        }
     }
 
     private async Task<DeviceCredential> RefreshAsync(
